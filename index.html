@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Motorstock Showroom ERP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <section id="splash" class="splash is-active" aria-label="Motorstock loading screen">
+    <div class="splash-mark">
+      <span class="orbit orbit-a"></span>
+      <span class="orbit orbit-b"></span>
+      <img src="assets/logobike.png" alt="Motorstock logo">
+    </div>
+    <h1>MOTORSTOCK</h1>
+    <span class="brand-rule"></span>
+    <p>SMART DEALERSHIP MANAGEMENT</p>
+    <div class="loader"><span></span></div>
+    <small>v1.0.0</small>
+  </section>
+
+  <main id="app" class="app hidden">
+    <section id="loginView" class="login-view">
+      <div class="home-brand-top">
+        <img src="assets/logobike.png" alt="Motorstock logo">
+        <span>MOTORSTOCK</span>
+      </div>
+      <div class="home-stage" aria-hidden="true">
+        <span class="helmet helmet-a"></span>
+        <span class="helmet helmet-b"></span>
+        <span class="helmet helmet-c"></span>
+        <span class="helmet helmet-d"></span>
+        <span class="helmet helmet-e"></span>
+        <span class="helmet helmet-f"></span>
+        <img class="home-bike" src="assets/bike1.png" alt="">
+        <h1 class="home-title">MOTORSTOCK</h1>
+      </div>
+      <form id="loginForm" class="login-card">
+        <h3>Showroom Login</h3>
+        <label>Email or Username<input id="email" type="text" autocomplete="username" placeholder="admin@gmail.com"></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" placeholder="Enter password"></label>
+        <button class="primary-btn" type="submit"><i data-lucide="log-in"></i> Submit</button>
+        <button id="adminFill" class="ghost-btn" type="button"><i data-lucide="shield-check"></i> Admin</button>
+        <button id="demoEntry" class="ghost-btn" type="button">Explore demo without database</button>
+        <p class="hint">Staff demo: <b>vizag_a</b> / <b>staff123</b></p>
+      </form>
+    </section>
+
+    <section id="workspace" class="workspace hidden">
+      <aside class="sidebar glass">
+        <button id="brandHome" class="brand-button">
+          <img src="assets/logobike.png" alt="">
+          <span><b>MOTORSTOCK</b><small id="roleLabel">Admin Console</small></span>
+        </button>
+        <nav id="nav"></nav>
+        <button id="logoutBtn" class="logout-btn"><i data-lucide="log-out"></i><span>Logout</span></button>
+      </aside>
+      <section class="content">
+        <header class="topbar glass">
+          <div>
+            <p id="welcomeEyebrow">Welcome back</p>
+            <h2 id="pageTitle">Dashboard</h2>
+          </div>
+          <div class="top-actions">
+            <button class="icon-btn" title="Notifications"><i data-lucide="bell"></i></button>
+            <button class="avatar" id="avatar">A</button>
+          </div>
+        </header>
+        <div id="pageContent"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="modalRoot"></div>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="demo-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

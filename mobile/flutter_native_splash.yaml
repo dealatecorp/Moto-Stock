@@ -1,0 +1,17 @@
+flutter_native_splash:
+  android: true
+  ios: true
+  web: false
+  color: '#FFFFFF'
+  color_dark: '#FFFFFF'
+  image: assets/motorstock-splash.png
+  image_dark: assets/motorstock-splash.png
+  android_gravity: center
+  ios_content_mode: center
+  android_min_sdk: 24
+  fullscreen: false
+  android_12:
+    color: '#FFFFFF'
+    color_dark: '#FFFFFF'
+    image: assets/motorstock-splash-android12.png
+    image_dark: assets/motorstock-splash-android12.png
