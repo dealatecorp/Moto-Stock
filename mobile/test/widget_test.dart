@@ -29,6 +29,7 @@ void main() {
         phone: '9000000000',
         address: 'Vizag',
         employee: 'Admin',
+        customerImage: 'data:image/jpeg;base64,Y3VzdG9tZXI=',
         paid: 1000,
       ),
     );
@@ -36,6 +37,10 @@ void main() {
     expect(sale.balance, bike.price - 1000);
     final restored = MotorStore(store.preferences)..load();
     expect(restored.sales.any((s) => s.id == sale.id), true);
+    expect(
+      restored.sales.firstWhere((s) => s.id == sale.id).customerImage,
+      'data:image/jpeg;base64,Y3VzdG9tZXI=',
+    );
     await expectLater(
       store.recordPayment(sale, sale.balance + 1),
       throwsStateError,
@@ -92,19 +97,13 @@ void main() {
     expect(find.byKey(const Key('welcomeSignIn')), findsOneWidget);
     await tester.tap(find.byKey(const Key('welcomeSignIn')));
     await tester.pumpAndSettle();
-    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.bySemanticsLabel('Welcome back'), findsOneWidget);
     await tester.tap(find.byKey(const Key('login')));
     await tester.pumpAndSettle();
-    expect(find.text('Network snapshot'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
     expect(find.text('New vehicle'), findsNothing);
     expect(tester.takeException(), isNull);
-    for (final label in [
-      'Sale In',
-      'Sale Out',
-      'Billing',
-      'Stores',
-      'Dashboard',
-    ]) {
+    for (final label in ['Sales In', 'Sales Out', 'Bill', 'Stores', 'Home']) {
       await tester.tap(
         find.descendant(
           of: find.byType(NavigationBar),
@@ -117,7 +116,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationBar),
-        matching: find.text('Sale In'),
+        matching: find.text('Sales In'),
       ),
     );
     await tester.pumpAndSettle();
@@ -126,7 +125,7 @@ void main() {
       'not-a-bike',
     );
     await tester.pumpAndSettle();
-    expect(find.text('No vehicles found'), findsOneWidget);
+    expect(find.text('No bikes found'), findsOneWidget);
   });
   testWidgets(
     'store opens its employees and employee statistics on a narrow phone',

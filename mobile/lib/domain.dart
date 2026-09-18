@@ -141,7 +141,13 @@ class Staff {
 
 class BillDraft {
   final Vehicle vehicle;
-  final String customer, phone, address, paymentMode, kind, employee;
+  final String customer,
+      phone,
+      address,
+      paymentMode,
+      kind,
+      employee,
+      customerImage;
   final int quantity, months;
   final double extras, repairCost, discount, taxRate, paid, interest;
   final bool finance;
@@ -151,6 +157,7 @@ class BillDraft {
     required this.phone,
     required this.address,
     required this.employee,
+    this.customerImage = '',
     this.quantity = 1,
     this.extras = 0,
     this.repairCost = 0,
@@ -185,7 +192,8 @@ class Sale {
       status,
       kind,
       staffId,
-      vehicleImage;
+      vehicleImage,
+      customerImage;
   final DateTime date;
   final int quantity, months, emisPaid;
   final double unitPrice,
@@ -217,6 +225,7 @@ class Sale {
     required this.paid,
     this.staffId = '',
     this.vehicleImage = '',
+    this.customerImage = '',
     this.unitPrice = 0,
     this.extras = 0,
     this.repairCost = 0,
@@ -258,6 +267,7 @@ class Sale {
     kind: kind,
     staffId: staffId,
     vehicleImage: vehicleImage,
+    customerImage: customerImage,
     unitPrice: unitPrice,
     extras: extras,
     repairCost: repairCost,
@@ -289,6 +299,7 @@ class Sale {
     'kind': kind,
     'staffId': staffId,
     'vehicleImage': vehicleImage,
+    'customerImage': customerImage,
     'unitPrice': unitPrice,
     'extras': extras,
     'repairCost': repairCost,
@@ -320,6 +331,7 @@ class Sale {
     kind: j['kind'],
     staffId: j['staffId'] ?? '',
     vehicleImage: j['vehicleImage'] ?? '',
+    customerImage: j['customerImage'] ?? '',
     unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,
     extras: (j['extras'] as num?)?.toDouble() ?? 0,
     repairCost: (j['repairCost'] as num?)?.toDouble() ?? 0,

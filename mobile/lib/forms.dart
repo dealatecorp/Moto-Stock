@@ -1,9 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'domain.dart';
+import 'motion.dart';
 import 'store.dart';
 import 'ui.dart';
 import 'invoice.dart';
@@ -47,23 +47,37 @@ Widget select(
   String value,
   List<String> choices,
   ValueChanged<String> change,
-) => Padding(
-  padding: const EdgeInsets.only(bottom: 14),
-  child: DropdownButtonFormField<String>(
-    initialValue: value,
-    isExpanded: true,
-    decoration: InputDecoration(labelText: label),
-    items: choices
-        .map(
-          (v) => DropdownMenuItem(
-            value: v,
-            child: Text(v, overflow: TextOverflow.ellipsis),
-          ),
-        )
-        .toList(),
-    onChanged: (v) {
-      if (v != null) change(v);
-    },
+) => Builder(
+  builder: (context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      itemHeight: 52,
+      menuMaxHeight: MediaQuery.sizeOf(context).height * .48,
+      borderRadius: BorderRadius.circular(16),
+      dropdownColor: raisedColor(context),
+      iconEnabledColor: secondaryTextColor(context),
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+      decoration: InputDecoration(labelText: label),
+      items: choices
+          .map(
+            (v) => DropdownMenuItem(
+              value: v,
+              child: Text(v, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: (v) {
+        if (v != null && v != value) {
+          HapticFeedback.selectionClick();
+          change(v);
+        }
+      },
+    ),
   ),
 );
 
@@ -175,7 +189,7 @@ class _VehicleFormState extends State<VehicleForm> {
   }
 
   Future<void> save() async {
-    if (!form.currentState!.validate()) return;
+    if (busy || !form.currentState!.validate()) return;
     setState(() => busy = true);
     String? uploadedImage;
     try {
@@ -234,20 +248,27 @@ class _VehicleFormState extends State<VehicleForm> {
     body: Form(
       key: form,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
         children: [
-          Text(
-            widget.vehicle == null
-                ? 'Register a motorcycle'
-                : 'Update stock & details',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.store.usesSupabase
-                ? 'Records are saved to Supabase.'
-                : 'Demo records are saved locally.',
-            style: const TextStyle(color: muted),
+          MotionEntrance(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.vehicle == null
+                      ? 'Register a motorcycle'
+                      : 'Update stock & details',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.store.usesSupabase
+                      ? 'Records are saved to Supabase.'
+                      : 'Demo records are saved locally.',
+                  style: const TextStyle(color: muted),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 22),
           Panel(
@@ -280,7 +301,7 @@ class _VehicleFormState extends State<VehicleForm> {
                     height: 120,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: canvas,
+                      color: Theme.of(context).scaffoldBackgroundColor,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -383,7 +404,12 @@ class _VehicleFormState extends State<VehicleForm> {
             key: const Key('saveVehicle'),
             onPressed: busy || pickingPhoto ? null : save,
             icon: const Icon(Icons.check),
-            label: Text(busy ? 'Saving…' : 'Save vehicle'),
+            label: MotionSwitcher(
+              child: Text(
+                busy ? 'Saving…' : 'Save vehicle',
+                key: ValueKey(busy),
+              ),
+            ),
           ),
         ],
       ),
@@ -589,7 +615,6 @@ Future<void> staffDialog(
   final name = TextEditingController(text: employee?.name ?? '');
   final key = GlobalKey<FormState>();
   String branch = employee?.branch ?? initialBranch ?? store.branchNames.first,
-      shift = employee?.shift ?? 'A',
       role = employee?.role ?? 'Sales Executive';
   bool busy = false;
   await showDialog<void>(
@@ -615,10 +640,6 @@ Future<void> staffDialog(
                   'Manager',
                   'Billing Agent',
                 ], (v) => setState(() => role = v)),
-                select('Shift', shift, [
-                  'A',
-                  'B',
-                ], (v) => setState(() => shift = v)),
                 Text(
                   store.usesSupabase
                       ? 'Adding a team record does not create a Supabase Auth login.'
@@ -649,7 +670,7 @@ Future<void> staffDialog(
                           name: name.text.trim(),
                           branch: branch,
                           role: role,
-                          shift: shift,
+                          shift: employee?.shift ?? 'A',
                           frozen: employee?.frozen ?? false,
                         ),
                       );
@@ -691,7 +712,12 @@ class _BillingPageState extends State<BillingPage> {
       interest = TextEditingController(text: '9.5');
   String? vehicleId;
   String kind = 'Vehicle sale', mode = 'UPI';
-  bool finance = false, busy = false;
+  Uint8List? customerPhotoBytes;
+  String customerPhotoExtension = 'jpg',
+      customerPhotoContentType = 'image/jpeg',
+      customerImage = '';
+  bool finance = false, busy = false, pickingCustomerPhoto = false;
+  final chargesController = ExpansibleController();
   int months = 36;
   @override
   void initState() {
@@ -722,6 +748,7 @@ class _BillingPageState extends State<BillingPage> {
     ]) {
       c.dispose();
     }
+    chargesController.dispose();
     super.dispose();
   }
 
@@ -734,6 +761,160 @@ class _BillingPageState extends State<BillingPage> {
     return null;
   }
 
+  Future<void> chooseCustomerPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    setState(() => pickingCustomerPhoto = true);
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 78,
+        requestFullMetadata: false,
+      );
+      if (photo == null) return;
+      final bytes = await photo.readAsBytes();
+      final isJpeg = bytes.length > 2 && bytes[0] == 0xff && bytes[1] == 0xd8;
+      final isPng =
+          bytes.length > 8 &&
+          bytes[0] == 0x89 &&
+          bytes[1] == 0x50 &&
+          bytes[2] == 0x4e &&
+          bytes[3] == 0x47;
+      final isWebp =
+          bytes.length > 12 &&
+          String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+          String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP';
+      if (!isJpeg && !isPng && !isWebp) {
+        throw StateError('Choose a JPG, PNG or WebP photo.');
+      }
+      final limit = widget.store.usesSupabase ? 5 << 20 : 1 << 20;
+      if (bytes.length > limit) {
+        throw StateError(
+          widget.store.usesSupabase
+              ? 'Choose a photo smaller than 5 MB.'
+              : 'Choose a photo smaller than 1 MB in demo mode.',
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        customerPhotoBytes = bytes;
+        customerImage = '';
+        customerPhotoExtension = isJpeg
+            ? 'jpg'
+            : isPng
+            ? 'png'
+            : 'webp';
+        customerPhotoContentType = isJpeg
+            ? 'image/jpeg'
+            : isPng
+            ? 'image/png'
+            : 'image/webp';
+      });
+    } catch (e) {
+      if (mounted) {
+        notice(
+          context,
+          'Could not add customer photo: ${e.toString().replaceFirst('Bad state: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => pickingCustomerPhoto = false);
+    }
+  }
+
+  Widget customerPhotoControl() {
+    final bytes = customerPhotoBytes;
+    if (bytes == null) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          key: const Key('addCustomerPhoto'),
+          onPressed: busy || pickingCustomerPhoto ? null : chooseCustomerPhoto,
+          icon: pickingCustomerPhoto
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.add_a_photo_outlined),
+          label: const Text('Add customer photo'),
+        ),
+      );
+    }
+    return Container(
+      key: const Key('customerPhotoPreview'),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor(context)),
+      ),
+      child: Row(
+        children: [
+          Semantics(
+            image: true,
+            label: 'Selected customer photo',
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.memory(
+                bytes,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Customer photo',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextButton(
+                  onPressed: busy ? null : chooseCustomerPhoto,
+                  child: const Text('Change'),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const Key('removeCustomerPhoto'),
+            tooltip: 'Remove customer photo',
+            onPressed: busy
+                ? null
+                : () => setState(() {
+                    customerPhotoBytes = null;
+                    customerImage = '';
+                  }),
+            icon: const Icon(Icons.delete_outline_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
   BillDraft? get draft {
     final v = selected;
     if (v == null) return null;
@@ -743,6 +924,7 @@ class _BillingPageState extends State<BillingPage> {
       phone: phone.text.trim(),
       address: address.text.trim(),
       employee: widget.store.userName,
+      customerImage: customerImage,
       quantity: int.tryParse(quantity.text) ?? 1,
       extras: double.tryParse(extras.text) ?? 0,
       repairCost: double.tryParse(repair.text) ?? 0,
@@ -758,25 +940,57 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   Future<void> save() async {
-    if (!form.currentState!.validate()) return;
+    if (busy) return;
+    final errors = form.currentState!.validateGranularly();
+    if (errors.isNotEmpty) {
+      if (errors.any(
+        (field) =>
+            field.context
+                .findAncestorWidgetOfExactType<DetailDisclosure>()
+                ?.key ==
+            const Key('billingCharges'),
+      )) {
+        chargesController.expand();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !errors.first.mounted) return;
+        Scrollable.ensureVisible(
+          errors.first.context,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 300),
+          alignment: .2,
+        );
+      });
+      return;
+    }
     final bill = draft;
     if (bill == null) {
       notice(context, 'Select an available vehicle.');
       return;
     }
-    if (!await confirm(
-      context,
-      widget.store.usesSupabase
-          ? 'Generate invoice?'
-          : 'Generate demo invoice?',
-      'Reserve ${bill.quantity} unit(s) and record ${money(bill.total)} for ${bill.customer}?',
-    )) {
-      return;
-    }
-    if (!mounted) return;
     setState(() => busy = true);
     try {
-      final sale = await widget.store.createSale(bill);
+      if (!await confirm(
+        context,
+        widget.store.usesSupabase
+            ? 'Generate invoice?'
+            : 'Generate demo invoice?',
+        'Reserve ${bill.quantity} unit(s) and record ${money(bill.total)} for ${bill.customer}?',
+      )) {
+        return;
+      }
+      if (!mounted) return;
+      if (customerPhotoBytes != null && customerImage.isEmpty) {
+        customerImage = await widget.store.saveCustomerImage(
+          bytes: customerPhotoBytes!,
+          contentType: customerPhotoContentType,
+          extension: customerPhotoExtension,
+          invoiceReference: DateTime.now().microsecondsSinceEpoch.toString(),
+          branchName: bill.vehicle.branch,
+        );
+      }
+      final sale = await widget.store.createSale(draft!);
       if (mounted) {
         customer.clear();
         phone.clear();
@@ -786,7 +1000,11 @@ class _BillingPageState extends State<BillingPage> {
         discount.text = '0';
         tax.text = '0';
         paid.text = '0';
-        setState(() => vehicleId = null);
+        setState(() {
+          vehicleId = null;
+          customerPhotoBytes = null;
+          customerImage = '';
+        });
         await viewInvoice(context, sale);
       }
     } catch (e) {
@@ -804,238 +1022,364 @@ class _BillingPageState extends State<BillingPage> {
     return Form(
       key: form,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            'Billing desk',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const Text(
-            'Create an invoice. Keep the ledger in sync.',
-            style: TextStyle(color: muted, fontSize: 12),
-          ),
-          const SizedBox(height: 18),
-          Pill(
-            widget.store.usesSupabase
-                ? 'CLOUD INVOICE · VERIFY TAX DETAILS'
-                : 'DEMO INVOICE · LOCAL RECORD',
-          ),
-          const SectionTitle('01  Vehicle & sale information'),
-          Panel(
-            child: Column(
-              children: [
-                select('Sale type', kind, [
-                  'Vehicle sale',
-                  'Booking',
-                ], (v) => setState(() => kind = v)),
-                DropdownButtonFormField<String>(
-                  key: ValueKey('${vehicleId}_${available.length}'),
-                  initialValue: selected?.id,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Select motorcycle',
-                  ),
-                  items: available
-                      .map(
-                        (v) => DropdownMenuItem(
-                          value: v.id,
-                          child: Text(
-                            '${v.name} · ${v.branch}',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  validator: (v) => v == null ? 'Choose a vehicle' : null,
-                  onChanged: (v) => setState(() => vehicleId = v),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'New invoice',
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                if (available.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: Text(
-                      'No available stock. Add a vehicle in Sale In.',
-                      style: TextStyle(color: amber),
+              ),
+              if (!widget.store.usesSupabase) const Pill('Demo', color: muted),
+            ],
+          ),
+          const SectionTitle('Vehicle'),
+          MotionEntrance(
+            order: 1,
+            child: Panel(
+              child: Column(
+                children: [
+                  select('Sale type', kind, [
+                    'Vehicle sale',
+                    'Booking',
+                  ], (v) => setState(() => kind = v)),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('${vehicleId}_${available.length}'),
+                    initialValue: selected?.id,
+                    isExpanded: true,
+                    itemHeight: 52,
+                    menuMaxHeight: MediaQuery.sizeOf(context).height * .48,
+                    borderRadius: BorderRadius.circular(16),
+                    dropdownColor: raisedColor(context),
+                    iconEnabledColor: secondaryTextColor(context),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Select motorcycle',
+                    ),
+                    items: available
+                        .map(
+                          (v) => DropdownMenuItem(
+                            value: v.id,
+                            child: Text(
+                              '${v.name} · ${v.branch}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    validator: (v) => v == null ? 'Choose a vehicle' : null,
+                    onChanged: (v) {
+                      if (v == vehicleId) return;
+                      HapticFeedback.selectionClick();
+                      setState(() => vehicleId = v);
+                    },
+                  ),
+                  if (available.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Text(
+                        'No available stock. Add a vehicle in Sale In.',
+                        style: TextStyle(color: amber),
+                      ),
+                    ),
+                  MotionSwitcher(
+                    child: selected == null
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            key: ValueKey(selected!.id),
+                            padding: const EdgeInsets.only(top: 14),
+                            child: Row(
+                              children: [
+                                BikeImage(selected!, width: 62, height: 55),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        selected!.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${selected!.stock} available · ${money(selected!.price)}',
+                                        style: const TextStyle(
+                                          color: muted,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 16),
+                  field(
+                    quantity,
+                    'Quantity',
+                    numeric: true,
+                    validate: (v) {
+                      final n = int.tryParse(v ?? '');
+                      return n == null || n < 1 || n > (selected?.stock ?? 0)
+                          ? 'Enter an available whole quantity'
+                          : null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SectionTitle('Customer'),
+          MotionEntrance(
+            order: 2,
+            child: Panel(
+              child: Column(
+                children: [
+                  field(customer, 'Customer full name'),
+                  field(
+                    phone,
+                    'Phone number',
+                    numeric: true,
+                    validate: (v) => RegExp(r'^\d{10}$').hasMatch(v ?? '')
+                        ? null
+                        : 'Enter a 10-digit phone number',
+                  ),
+                  field(address, 'Registration address', lines: 2),
+                  customerPhotoControl(),
+                ],
+              ),
+            ),
+          ),
+          const SectionTitle('Payment'),
+          MotionEntrance(
+            order: 3,
+            child: Panel(
+              child: Column(
+                children: [
+                  select('Payment method', mode, [
+                    'UPI',
+                    'Cash',
+                    'Bank transfer',
+                    'Card',
+                    'Cheque',
+                  ], (v) => setState(() => mode = v)),
+                  field(
+                    paid,
+                    'Amount received (₹)',
+                    numeric: true,
+                    validate: (v) {
+                      final err = nonnegativeNumber(v);
+                      if (err != null) return err;
+                      return double.parse(v!) > (bill?.total ?? 0)
+                          ? 'Payment exceeds invoice total'
+                          : null;
+                    },
+                  ),
+                  DetailDisclosure(
+                    key: const Key('billingCharges'),
+                    controller: chargesController,
+                    title: 'Charges & tax',
+                    child: Column(
+                      children: [
+                        field(
+                          extras,
+                          'Registration & extras (₹)',
+                          numeric: true,
+                          validate: nonnegativeNumber,
+                        ),
+                        field(
+                          repair,
+                          'Repair cost (₹)',
+                          numeric: true,
+                          validate: nonnegativeNumber,
+                        ),
+                        field(
+                          discount,
+                          'Discount (₹)',
+                          numeric: true,
+                          validate: (v) {
+                            final err = nonnegativeNumber(v);
+                            if (err != null) return err;
+                            return double.parse(v!) > (bill?.subtotal ?? 0)
+                                ? 'Discount exceeds subtotal'
+                                : null;
+                          },
+                        ),
+                        field(
+                          tax,
+                          'GST rate (%)',
+                          numeric: true,
+                          validate: (v) {
+                            final err = nonnegativeNumber(v);
+                            if (err != null) return err;
+                            return double.parse(v!) > 100
+                                ? 'Enter a rate from 0 to 100'
+                                : null;
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                if (selected != null) ...[
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    key: const Key('financeToggle'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'EMI estimate',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    value: finance,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      setState(() => finance = v);
+                    },
+                  ),
+                  _expandingSection(
+                    key: const Key('financeFields'),
+                    // Remove inactive fields immediately so they cannot receive
+                    // focus or take part in validation during the collapse.
+                    child: finance
+                        ? Column(
+                            children: [
+                              field(
+                                interest,
+                                'Annual interest rate (%)',
+                                numeric: true,
+                                validate: nonnegativeNumber,
+                              ),
+                              select(
+                                'Tenure',
+                                '$months months',
+                                [
+                                  12,
+                                  24,
+                                  36,
+                                  48,
+                                  60,
+                                  72,
+                                ].map((v) => '$v months').toList(),
+                                (v) => setState(
+                                  () => months = int.parse(v.split(' ').first),
+                                ),
+                              ),
+                            ],
+                          )
+                        : const SizedBox(width: double.infinity),
+                  ),
+                  DetailDisclosure(
+                    key: const Key('billingBreakdown'),
+                    title: 'Price breakdown',
+                    child: Column(
+                      children: [
+                        valueRow(
+                          'Vehicle amount',
+                          money(
+                            (bill?.vehicle.price ?? 0) * (bill?.quantity ?? 0),
+                          ),
+                        ),
+                        valueRow(
+                          'Registration / extras',
+                          money(bill?.extras ?? 0),
+                        ),
+                        valueRow('Repair cost', money(bill?.repairCost ?? 0)),
+                        valueRow('Subtotal', money(bill?.subtotal ?? 0)),
+                        valueRow('Discount', money(bill?.discount ?? 0)),
+                        valueRow(
+                          'GST (${(bill?.taxRate ?? 0).toStringAsFixed(2)}%)',
+                          money(bill?.tax ?? 0),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      BikeImage(selected!, width: 62, height: 55),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: line),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
                           children: [
-                            Text(
-                              selected!.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                'Total invoice',
+                                style: TextStyle(
+                                  color: muted,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                            Text(
-                              '${selected!.stock} available · ${money(selected!.price)}',
-                              style: const TextStyle(
-                                color: muted,
-                                fontSize: 11,
-                              ),
+                            Icon(
+                              Icons.receipt_long_rounded,
+                              color: accent,
+                              size: 20,
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        AnimatedAmount(
+                          key: const Key('invoiceTotal'),
+                          value: bill?.total ?? 0,
+                          format: money,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -.8,
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Divider(),
+                        ),
+                        _summaryAmount(
+                          'Balance payable',
+                          bill?.balance ?? 0,
+                          amountKey: const Key('invoiceBalance'),
+                          color: amber,
+                        ),
+                        _expandingSection(
+                          child: finance
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: _summaryAmount(
+                                    'Estimated monthly EMI',
+                                    bill?.installment ?? 0,
+                                    amountKey: const Key('invoiceEmi'),
+                                    color: blue,
+                                  ),
+                                )
+                              : const SizedBox(width: double.infinity),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-                const SizedBox(height: 16),
-                field(
-                  quantity,
-                  'Quantity',
-                  numeric: true,
-                  validate: (v) {
-                    final n = int.tryParse(v ?? '');
-                    return n == null || n < 1 || n > (selected?.stock ?? 0)
-                        ? 'Enter an available whole quantity'
-                        : null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SectionTitle('02  Customer details'),
-          Panel(
-            child: Column(
-              children: [
-                field(customer, 'Customer full name'),
-                field(
-                  phone,
-                  'Phone number',
-                  numeric: true,
-                  validate: (v) => RegExp(r'^\d{10}$').hasMatch(v ?? '')
-                      ? null
-                      : 'Enter a 10-digit phone number',
-                ),
-                field(address, 'Registration address', lines: 2),
-              ],
-            ),
-          ),
-          const SectionTitle('03  Payment & financial ledger'),
-          Panel(
-            child: Column(
-              children: [
-                select('Payment method', mode, [
-                  'UPI',
-                  'Cash',
-                  'Bank transfer',
-                  'Card',
-                  'Cheque',
-                ], (v) => setState(() => mode = v)),
-                field(
-                  extras,
-                  'Registration / Insurance / Extras (₹)',
-                  numeric: true,
-                  validate: nonnegativeNumber,
-                ),
-                field(
-                  repair,
-                  'Repair cost (₹)',
-                  numeric: true,
-                  validate: nonnegativeNumber,
-                ),
-                field(
-                  discount,
-                  'Discount (₹)',
-                  numeric: true,
-                  validate: (v) {
-                    final err = nonnegativeNumber(v);
-                    if (err != null) return err;
-                    return double.parse(v!) > (bill?.subtotal ?? 0)
-                        ? 'Discount exceeds subtotal'
-                        : null;
-                  },
-                ),
-                field(
-                  tax,
-                  'GST rate (%)',
-                  numeric: true,
-                  validate: (v) {
-                    final err = nonnegativeNumber(v);
-                    if (err != null) return err;
-                    return double.parse(v!) > 100
-                        ? 'Enter a rate from 0 to 100'
-                        : null;
-                  },
-                ),
-                field(
-                  paid,
-                  'Amount received (₹)',
-                  numeric: true,
-                  validate: (v) {
-                    final err = nonnegativeNumber(v);
-                    if (err != null) return err;
-                    return double.parse(v!) > (bill?.total ?? 0)
-                        ? 'Payment exceeds invoice total'
-                        : null;
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('EMI finance estimate'),
-                  subtitle: const Text('Plan installments on the balance'),
-                  value: finance,
-                  onChanged: (v) => setState(() => finance = v),
-                ),
-                if (finance) ...[
-                  field(
-                    interest,
-                    'Annual interest rate (%)',
-                    numeric: true,
-                    validate: nonnegativeNumber,
-                  ),
-                  select(
-                    'Tenure',
-                    '$months months',
-                    [12, 24, 36, 48, 60, 72].map((v) => '$v months').toList(),
-                    (v) =>
-                        setState(() => months = int.parse(v.split(' ').first)),
-                  ),
-                ],
-                const Divider(),
-                valueRow(
-                  'Vehicle amount',
-                  money((bill?.vehicle.price ?? 0) * (bill?.quantity ?? 0)),
-                ),
-                valueRow('Registration / extras', money(bill?.extras ?? 0)),
-                valueRow('Repair cost', money(bill?.repairCost ?? 0)),
-                valueRow('Subtotal', money(bill?.subtotal ?? 0)),
-                valueRow('Discount', money(bill?.discount ?? 0)),
-                valueRow(
-                  'GST (${(bill?.taxRate ?? 0).toStringAsFixed(2)}%)',
-                  money(bill?.tax ?? 0),
-                ),
-                valueRow(
-                  'Total invoice',
-                  money(bill?.total ?? 0),
-                  bold: true,
-                  color: blue,
-                ),
-                valueRow(
-                  'Balance payable',
-                  money(bill?.balance ?? 0),
-                  bold: true,
-                  color: amber,
-                ),
-                if (finance)
-                  valueRow(
-                    'Estimated monthly EMI',
-                    money(bill?.installment ?? 0),
-                  ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
           const Text(
-            'Saving reserves stock, including bookings. GST is calculated on vehicle amount, extras, and repair cost after discount. Verify the applicable rate before invoicing.',
+            'Generating an invoice reserves stock. Check charges and GST before saving.',
             style: TextStyle(fontSize: 11, color: muted, height: 1.5),
           ),
           const SizedBox(height: 16),
@@ -1043,11 +1387,56 @@ class _BillingPageState extends State<BillingPage> {
             key: const Key('generateInvoice'),
             onPressed: busy ? null : save,
             icon: const Icon(Icons.receipt_long),
-            label: Text(busy ? 'Generating…' : 'Generate invoice'),
+            label: MotionSwitcher(
+              child: Text(
+                busy ? 'Generating…' : 'Generate invoice',
+                key: ValueKey(busy),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  Widget _summaryAmount(
+    String label,
+    num amount, {
+    required Key amountKey,
+    required Color color,
+  }) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Text(label, style: const TextStyle(color: muted, fontSize: 12)),
+      ),
+      const SizedBox(width: 12),
+      Flexible(
+        child: AnimatedAmount(
+          key: amountKey,
+          value: amount,
+          format: money,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            color: color,
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _expandingSection({Key? key, required Widget child}) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return KeyedSubtree(key: key, child: child);
+    }
+    return AnimatedSize(
+      key: key,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+      alignment: Alignment.topCenter,
+      child: child,
     );
   }
 }

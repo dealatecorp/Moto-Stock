@@ -27,9 +27,9 @@
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>NSCameraUsageDescription</key>
-		<string>Take a vehicle photo for your inventory and invoices.</string>
+		<string>Take vehicle or customer photos for dealership records and invoices.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Select a vehicle photo for your inventory and invoices.</string>
+		<string>Select vehicle or customer photos for dealership records and invoices.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

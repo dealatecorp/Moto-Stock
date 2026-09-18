@@ -50,6 +50,7 @@ void main() {
       employee: 'Employee',
       staffId: 'employee-1',
       vehicleImage: vehicle.image,
+      customerImage: 'data:image/jpeg;base64,Y3VzdG9tZXI=',
       date: DateTime(2026, 9, 16),
       unitPrice: vehicle.price,
       extras: 5000,
@@ -65,9 +66,13 @@ void main() {
     final restored = Sale.fromJson(sale.toJson());
     expect(restored.staffId, 'employee-1');
     expect(restored.vehicleImage, vehicle.image);
+    expect(restored.customerImage, 'data:image/jpeg;base64,Y3VzdG9tZXI=');
     expect(restored.unitPrice, 100000);
     expect(restored.extras, 5000);
     expect(restored.repairCost, 2000);
     expect(restored.taxRate, 18);
+
+    final legacy = sale.toJson()..remove('customerImage');
+    expect(Sale.fromJson(legacy).customerImage, isEmpty);
   });
 }

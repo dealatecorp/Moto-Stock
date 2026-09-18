@@ -8,6 +8,7 @@ import 'store.dart';
 import 'supabase_backend.dart';
 import 'ui.dart';
 import 'screens.dart';
+import 'motion.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -128,14 +129,22 @@ class MotorStockApp extends StatelessWidget {
   final MotorStore store;
   const MotorStockApp({super.key, required this.store});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'MotorStock',
-    debugShowCheckedModeBanner: false,
-    theme: appTheme,
-    home: ListenableBuilder(
-      listenable: store,
-      builder: (context, _) =>
-          store.signedIn ? HomeScreen(store: store) : LoginScreen(store: store),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: store,
+    builder: (context, _) => MaterialApp(
+      title: 'MotorStock',
+      debugShowCheckedModeBanner: false,
+      theme: appTheme,
+      darkTheme: darkAppTheme,
+      themeMode: switch (store.appearance) {
+        'Dark' => ThemeMode.dark,
+        'System' => ThemeMode.system,
+        _ => ThemeMode.light,
+      },
+      scrollBehavior: const DealerScrollBehavior(),
+      home: store.signedIn
+          ? HomeScreen(store: store)
+          : LoginScreen(store: store),
     ),
   );
 }

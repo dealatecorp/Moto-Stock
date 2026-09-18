@@ -13,7 +13,7 @@ import 'ui.dart';
 String pdfMoney(num value) => money(value).replaceAll('₹', 'INR ');
 String pdfText(String value) => value.replaceAll(RegExp(r'[^\x20-\x7E]'), ' ');
 
-Future<pw.ImageProvider?> _invoiceVehicleImage(String source) async {
+Future<pw.ImageProvider?> _invoiceImage(String source) async {
   if (source.isEmpty) return null;
   try {
     late Uint8List bytes;
@@ -45,7 +45,11 @@ Future<pw.ImageProvider?> _invoiceVehicleImage(String source) async {
 
 Future<Uint8List> invoiceBytes(Sale sale) async {
   final doc = pw.Document();
-  final vehicleImage = await _invoiceVehicleImage(sale.vehicleImage);
+  final images = await Future.wait([
+    _invoiceImage(sale.vehicleImage),
+    _invoiceImage(sale.customerImage),
+  ]);
+  final vehicleImage = images[0], customerImage = images[1];
   final unitPrice = sale.unitPrice > 0
       ? sale.unitPrice
       : sale.quantity > 0
@@ -83,10 +87,42 @@ Future<Uint8List> invoiceBytes(Sale sale) async {
           ),
         ],
         pw.SizedBox(height: 20),
-        pw.Text('BILL TO', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        pw.Text(pdfText(sale.customer)),
-        pw.Text(sale.phone),
-        pw.Text(pdfText(sale.address)),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'BILL TO',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(pdfText(sale.customer)),
+                  pw.Text(sale.phone),
+                  pw.Text(pdfText(sale.address)),
+                ],
+              ),
+            ),
+            if (customerImage != null) ...[
+              pw.SizedBox(width: 18),
+              pw.Container(
+                width: 82,
+                height: 82,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                padding: const pw.EdgeInsets.all(3),
+                child: pw.ClipRRect(
+                  horizontalRadius: 6,
+                  verticalRadius: 6,
+                  child: pw.Image(customerImage, fit: pw.BoxFit.cover),
+                ),
+              ),
+            ],
+          ],
+        ),
         pw.SizedBox(height: 20),
         pw.TableHelper.fromTextArray(
           headers: ['Motorcycle', 'Quantity', 'Unit price', 'Vehicle amount'],

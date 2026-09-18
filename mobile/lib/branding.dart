@@ -1,9 +1,162 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'bike_assembly.dart';
+
 const brandTeal = Color(0xff007fa6);
 const brandNavy = Color(0xff100947);
-const brandLavender = Color(0xffe6dfff);
+
+/// Flutter adaptation of Inspira UI's Text Generate Effect.
+///
+/// Every word keeps its final layout position while opacity, blur and vertical
+/// offset animate in sequence. Reduced-motion settings reveal the text at once.
+class StaggeredTextReveal extends StatefulWidget {
+  final String words;
+  final TextStyle? style;
+  final bool enabled;
+  final TextAlign textAlign;
+  final bool filter;
+  final Duration duration;
+  final Duration delay;
+  final Duration stagger;
+
+  const StaggeredTextReveal({
+    super.key,
+    required this.words,
+    this.style,
+    this.enabled = true,
+    this.textAlign = TextAlign.center,
+    this.filter = true,
+    this.duration = const Duration(milliseconds: 700),
+    this.delay = Duration.zero,
+    this.stagger = const Duration(milliseconds: 70),
+  });
+
+  @override
+  State<StaggeredTextReveal> createState() => _StaggeredTextRevealState();
+}
+
+class _StaggeredTextRevealState extends State<StaggeredTextReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool _started = false;
+
+  List<String> get _words => widget.words
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList();
+
+  @override
+  void initState() {
+    super.initState();
+    final wordCount = _words.length;
+    final total =
+        widget.delay +
+        widget.duration +
+        widget.stagger * (wordCount > 0 ? wordCount - 1 : 0);
+    _controller = AnimationController(vsync: this, duration: total);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!widget.enabled || MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+      _started = true;
+    } else if (!_started) {
+      _started = true;
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final style = DefaultTextStyle.of(context).style.merge(widget.style);
+    if (!widget.enabled || reducedMotion) {
+      return Text(widget.words, style: style, textAlign: widget.textAlign);
+    }
+    final lines = widget.words.split('\n');
+    final alignment = switch (widget.textAlign) {
+      TextAlign.left || TextAlign.start => WrapAlignment.start,
+      TextAlign.right || TextAlign.end => WrapAlignment.end,
+      _ => WrapAlignment.center,
+    };
+    return Semantics(
+      label: widget.words,
+      child: ExcludeSemantics(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final elapsed =
+                _controller.value * (_controller.duration?.inMilliseconds ?? 1);
+            var wordIndex = 0;
+            Widget revealLine(String line) => Wrap(
+              alignment: alignment,
+              runAlignment: alignment,
+              spacing: (style.fontSize ?? 14) * .24,
+              runSpacing: 0,
+              children: line
+                  .trim()
+                  .split(RegExp(r'\s+'))
+                  .where((word) => word.isNotEmpty)
+                  .map((text) {
+                    final index = wordIndex++;
+                    final start =
+                        widget.delay.inMilliseconds +
+                        widget.stagger.inMilliseconds * index;
+                    final raw = _controller.isCompleted
+                        ? 1.0
+                        : ((elapsed - start) /
+                                  (widget.duration.inMilliseconds > 0
+                                      ? widget.duration.inMilliseconds
+                                      : 1))
+                              .clamp(0.0, 1.0);
+                    final progress = Curves.easeOutCubic.transform(raw);
+                    Widget word = Text(text, style: style);
+                    if (widget.filter && !reducedMotion && progress < 1) {
+                      word = ImageFiltered(
+                        imageFilter: ui.ImageFilter.blur(
+                          sigmaX: (1 - progress) * 5,
+                          sigmaY: (1 - progress) * 5,
+                        ),
+                        child: word,
+                      );
+                    }
+                    return Opacity(
+                      opacity: progress,
+                      child: Transform.translate(
+                        offset: Offset(0, (1 - progress) * 8),
+                        child: word,
+                      ),
+                    );
+                  })
+                  .toList(),
+            );
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: switch (widget.textAlign) {
+                TextAlign.left || TextAlign.start => CrossAxisAlignment.start,
+                TextAlign.right || TextAlign.end => CrossAxisAlignment.end,
+                _ => CrossAxisAlignment.center,
+              },
+              children: lines.map(revealLine).toList(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
 class MotorStockMark extends StatelessWidget {
   final double size;
@@ -28,12 +181,12 @@ class MotorStockSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
-    value: SystemUiOverlayStyle.dark.copyWith(
+    value: SystemUiOverlayStyle.light.copyWith(
       statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.white,
+      systemNavigationBarColor: brandNavy,
     ),
     child: Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: brandNavy,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -49,13 +202,14 @@ class MotorStockSplash extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xffe2e6f5)),
+                      border: Border.all(color: const Color(0x3373d7ed)),
                     ),
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xffe2e6f5)),
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0x6673d7ed)),
                       ),
                       child: const MotorStockMark(size: 84),
                     ),
@@ -70,7 +224,7 @@ class MotorStockSplash extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                         fontStyle: FontStyle.italic,
                         letterSpacing: 1.2,
-                        color: brandNavy,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -79,7 +233,7 @@ class MotorStockSplash extends StatelessWidget {
                     height: 5,
                     width: 64,
                     decoration: BoxDecoration(
-                      color: brandTeal,
+                      color: const Color(0xff73d7ed),
                       borderRadius: BorderRadius.circular(5),
                     ),
                   ),
@@ -92,7 +246,7 @@ class MotorStockSplash extends StatelessWidget {
                       height: 1.8,
                       letterSpacing: 2.4,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xff758196),
+                      color: Color(0xff9da9cb),
                     ),
                   ),
                   const SizedBox(height: 74),
@@ -101,14 +255,18 @@ class MotorStockSplash extends StatelessWidget {
                       width: 238,
                       child: LinearProgressIndicator(
                         minHeight: 4,
-                        color: brandTeal,
-                        backgroundColor: Color(0xffe7eaf1),
+                        color: Color(0xff73d7ed),
+                        backgroundColor: Color(0xff34305d),
                         borderRadius: BorderRadius.all(Radius.circular(4)),
                         semanticsLabel: 'Opening your showroom',
                       ),
                     )
                   else ...[
-                    Text(error!, textAlign: TextAlign.center),
+                    Text(
+                      error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white),
+                    ),
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: onRetry,
@@ -121,7 +279,7 @@ class MotorStockSplash extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 3,
-                      color: Color(0xff758196),
+                      color: Color(0xff9da9cb),
                     ),
                   ),
                 ],
@@ -140,18 +298,18 @@ class MotorStockWelcome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
-    value: SystemUiOverlayStyle.dark.copyWith(
+    value: SystemUiOverlayStyle.light.copyWith(
       statusBarColor: Colors.transparent,
-      systemNavigationBarColor: const Color(0xfff5f1ff),
+      systemNavigationBarColor: brandNavy,
     ),
     child: Scaffold(
-      backgroundColor: brandLavender,
+      backgroundColor: brandNavy,
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xffe1d8ff), Color(0xffebe5ff), Color(0xfff5f1ff)],
+            colors: [Color(0xff09072a), Color(0xff171047), Color(0xff102652)],
           ),
         ),
         child: SafeArea(
@@ -184,12 +342,14 @@ class MotorStockWelcome extends StatelessWidget {
                                   8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: .8),
+                                  color: Colors.white.withValues(alpha: .08),
                                   borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: Colors.white),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: .14),
+                                  ),
                                   boxShadow: const [
                                     BoxShadow(
-                                      color: Color(0x10100947),
+                                      color: Color(0x35000000),
                                       blurRadius: 24,
                                       offset: Offset(0, 10),
                                     ),
@@ -208,7 +368,7 @@ class MotorStockWelcome extends StatelessWidget {
                                           fontWeight: FontWeight.w900,
                                           fontStyle: FontStyle.italic,
                                           letterSpacing: .8,
-                                          color: brandNavy,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ),
@@ -231,104 +391,41 @@ class MotorStockWelcome extends StatelessWidget {
                               ),
                               child: Column(
                                 children: [
-                                  const SizedBox(height: 30),
-                                  const Text(
-                                    'SMART DEALERSHIP MANAGEMENT',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Color(0xff607083),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.7,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      'MOTO STOCK',
-                                      style: TextStyle(
-                                        fontSize: 42,
-                                        fontStyle: FontStyle.italic,
-                                        letterSpacing: 1,
-                                        fontWeight: FontWeight.w900,
-                                        color: brandNavy,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 24),
                                   SizedBox(
-                                    height: (viewport.maxHeight * .25).clamp(
-                                      152,
-                                      260,
+                                    width: double.infinity,
+                                    height: (viewport.maxHeight * .34).clamp(
+                                      230,
+                                      300,
                                     ),
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        Positioned(
-                                          bottom: 9,
-                                          child: Container(
-                                            width: 230,
-                                            height: 30,
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(100),
-                                              boxShadow: const [
-                                                BoxShadow(
-                                                  color: Color(0x22100947),
-                                                  blurRadius: 28,
-                                                  spreadRadius: 8,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        const Positioned(
-                                          top: 18,
-                                          left: 5,
-                                          child: _Helmet(angle: -.3),
-                                        ),
-                                        const Positioned(
-                                          top: 2,
-                                          right: 16,
-                                          child: _Helmet(angle: .2),
-                                        ),
-                                        const Positioned(
-                                          bottom: 16,
-                                          right: 0,
-                                          child: _Helmet(angle: -.2),
-                                        ),
-                                        Image.asset(
-                                          'assets/bike.png',
-                                          fit: BoxFit.contain,
-                                          semanticLabel:
-                                              'MotorStock motorcycle',
-                                        ),
-                                      ],
-                                    ),
+                                    child: const BikeAssembly(),
                                   ),
                                   const SizedBox(height: 14),
-                                  const Text(
-                                    'Your showroom.\nOne connected place.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 26,
-                                      height: 1.2,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -.6,
-                                      color: brandNavy,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  const Text(
-                                    'Inventory, sales and your team.\nEverything you need, wherever you are.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Color(0xff657081),
-                                      fontSize: 13,
-                                      height: 1.6,
-                                    ),
+                                  const Column(
+                                    children: [
+                                      StaggeredTextReveal(
+                                        words: 'Your showroom.',
+                                        delay: Duration(milliseconds: 180),
+                                        style: TextStyle(
+                                          fontSize: 26,
+                                          height: 1.2,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -.6,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      StaggeredTextReveal(
+                                        words: 'One connected place.',
+                                        delay: Duration(milliseconds: 320),
+                                        style: TextStyle(
+                                          fontSize: 26,
+                                          height: 1.2,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -.6,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 24),
                                 ],
@@ -341,8 +438,8 @@ class MotorStockWelcome extends StatelessWidget {
                                   key: const Key('welcomeSignIn'),
                                   onPressed: onSignIn,
                                   style: FilledButton.styleFrom(
-                                    backgroundColor: brandNavy,
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: Color(0xff73d7ed),
+                                    foregroundColor: brandNavy,
                                     minimumSize: const Size(
                                       double.infinity,
                                       56,
@@ -368,20 +465,9 @@ class MotorStockWelcome extends StatelessWidget {
                                       Icon(
                                         Icons.arrow_forward_rounded,
                                         size: 20,
-                                        color: Color(0xff73d7ed),
+                                        color: brandNavy,
                                       ),
                                     ],
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                const Text(
-                                  'BUILT FOR YOUR NEXT MILE',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 2,
-                                    color: Color(0xff64748b),
                                   ),
                                 ),
                               ],
@@ -396,29 +482,6 @@ class MotorStockWelcome extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    ),
-  );
-}
-
-class _Helmet extends StatelessWidget {
-  final double angle;
-  const _Helmet({required this.angle});
-
-  @override
-  Widget build(BuildContext context) => Transform.rotate(
-    angle: angle,
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .35),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: .5)),
-      ),
-      child: const Icon(
-        Icons.sports_motorsports_outlined,
-        size: 24,
-        color: Color(0xffa8c4d8),
       ),
     ),
   );

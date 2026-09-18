@@ -7,10 +7,14 @@ import 'domain.dart';
 import 'supabase_backend.dart';
 
 class MotorStore extends ChangeNotifier {
-  MotorStore(this.preferences, {this.remote});
+  MotorStore(this.preferences, {this.remote})
+    : appearance = preferences.getString(appearanceKey) ?? 'Light';
   final SharedPreferences preferences;
   final SupabaseMotorRepository? remote;
   static const storageKey = 'motorstock_demo_v1';
+  // Reset this redesign to its light glass default once, then remember future
+  // appearance changes under the new preference key.
+  static const appearanceKey = 'motorstock_appearance_v2';
   List<Vehicle> vehicles = [];
   List<Sale> sales = [];
   List<Branch> branches = [];
@@ -19,6 +23,7 @@ class MotorStore extends ChangeNotifier {
   String _userName = 'Network Admin';
   String _userBranch = '';
   String selectedBranch = 'All branches';
+  String appearance;
   bool get usesSupabase => remote != null;
   String get userName => _userName;
   String get userInitials {
@@ -185,6 +190,16 @@ class MotorStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setAppearance(String value) async {
+    if (!const {'Light', 'System', 'Dark'}.contains(value) ||
+        value == appearance) {
+      return;
+    }
+    appearance = value;
+    notifyListeners();
+    await preferences.setString(appearanceKey, value);
+  }
+
   void _requireAdmin() {
     if (!isAdmin) throw StateError('Admin access is required.');
   }
@@ -306,6 +321,7 @@ class MotorStore extends ChangeNotifier {
       employee: draft.employee,
       staffId: matchingStaff.isEmpty ? '' : matchingStaff.first.id,
       vehicleImage: draft.vehicle.image,
+      customerImage: draft.customerImage,
       date: now,
       unitPrice: draft.vehicle.price,
       extras: draft.extras,
@@ -359,7 +375,10 @@ class MotorStore extends ChangeNotifier {
           ? null
           : () => remote!.createSale(sale, draft, staff),
     );
-    if (remote != null) await refresh();
+    if (remote != null) {
+      await refresh();
+      return sales.firstWhere((saved) => saved.id == sale.id);
+    }
     return sale;
   }
 
@@ -496,6 +515,36 @@ class MotorStore extends ChangeNotifier {
   Future<void> deleteVehicleImage(String image) async {
     if (remote == null || image.isEmpty) return;
     await remote!.deleteVehicleImage(image);
+  }
+
+  Future<String> saveCustomerImage({
+    required Uint8List bytes,
+    required String contentType,
+    required String extension,
+    required String invoiceReference,
+    required String branchName,
+  }) async {
+    final limit = remote == null ? (1 << 20) : (5 << 20);
+    if (bytes.length > limit) {
+      throw StateError(
+        remote == null
+            ? 'Choose a compressed photo smaller than 1 MB in demo mode.'
+            : 'Choose a photo smaller than 5 MB.',
+      );
+    }
+    if (remote == null) {
+      return 'data:$contentType;base64,${base64Encode(bytes)}';
+    }
+    final branchId = branches
+        .firstWhere((branch) => branch.name == branchName)
+        .id;
+    return remote!.uploadCustomerImage(
+      bytes: bytes,
+      branchId: branchId,
+      invoiceReference: invoiceReference,
+      extension: extension,
+      contentType: contentType,
+    );
   }
 
   void seed() {

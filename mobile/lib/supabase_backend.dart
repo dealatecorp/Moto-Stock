@@ -122,7 +122,7 @@ class SupabaseMotorRepository {
       client
           .from('sales')
           .select(
-            'id, vehicle_id, branch_id, vehicle_name, vehicle_image_url, '
+            'id, vehicle_id, branch_id, vehicle_name, vehicle_image_url, customer_image_path, '
             'customer_name, phone, address, staff_id, employee_name, sold_at, '
             'unit_price, quantity, extras, repair_cost, subtotal, discount, '
             'tax_rate, tax, total, paid, payment_method, status, kind, finance, '
@@ -152,40 +152,49 @@ class SupabaseMotorRepository {
         'image': row['image_url'] ?? '',
       });
     }).toList();
-    final sales = _rows(values[1]).map((row) {
-      final branch = _branchName(branchNames, row['branch_id']);
-      return Sale.fromJson({
-        'id': row['id'],
-        'vehicleId': row['vehicle_id'],
-        'bike': row['vehicle_name'],
-        'branch': branch,
-        'customer': row['customer_name'],
-        'phone': row['phone'],
-        'address': row['address'],
-        'employee': row['employee_name'],
-        'staffId': row['staff_id'] ?? '',
-        'vehicleImage': row['vehicle_image_url'] ?? '',
-        'date': row['sold_at'],
-        'unitPrice': row['unit_price'],
-        'extras': row['extras'],
-        'repairCost': row['repair_cost'],
-        'subtotal': row['subtotal'],
-        'discount': row['discount'],
-        'taxRate': row['tax_rate'],
-        'tax': row['tax'],
-        'total': row['total'],
-        'paid': row['paid'],
-        'quantity': row['quantity'],
-        'mode': row['payment_method'],
-        'status': row['status'],
-        'kind': row['kind'],
-        'finance': row['finance'],
-        'months': row['months'],
-        'emisPaid': row['emis_paid'],
-        'installment': row['installment'],
-        'interest': row['interest'],
-      });
-    }).toList();
+    final sales = await Future.wait(
+      _rows(values[1]).map((row) async {
+        final branch = _branchName(branchNames, row['branch_id']);
+        final customerImagePath = row['customer_image_path'] as String? ?? '';
+        final customerImage = customerImagePath.isEmpty
+            ? ''
+            : await client.storage
+                  .from('customer-images')
+                  .createSignedUrl(customerImagePath, 3600);
+        return Sale.fromJson({
+          'id': row['id'],
+          'vehicleId': row['vehicle_id'],
+          'bike': row['vehicle_name'],
+          'branch': branch,
+          'customer': row['customer_name'],
+          'phone': row['phone'],
+          'address': row['address'],
+          'employee': row['employee_name'],
+          'staffId': row['staff_id'] ?? '',
+          'vehicleImage': row['vehicle_image_url'] ?? '',
+          'customerImage': customerImage,
+          'date': row['sold_at'],
+          'unitPrice': row['unit_price'],
+          'extras': row['extras'],
+          'repairCost': row['repair_cost'],
+          'subtotal': row['subtotal'],
+          'discount': row['discount'],
+          'taxRate': row['tax_rate'],
+          'tax': row['tax'],
+          'total': row['total'],
+          'paid': row['paid'],
+          'quantity': row['quantity'],
+          'mode': row['payment_method'],
+          'status': row['status'],
+          'kind': row['kind'],
+          'finance': row['finance'],
+          'months': row['months'],
+          'emisPaid': row['emis_paid'],
+          'installment': row['installment'],
+          'interest': row['interest'],
+        });
+      }),
+    );
     final staff = _rows(values[2]).map((row) {
       final branch = _branchName(branchNames, row['branch_id']);
       return Staff.fromJson({
@@ -228,7 +237,7 @@ class SupabaseMotorRepository {
 
   Future<void> createSale(Sale sale, BillDraft draft, List<Staff> staff) =>
       client.rpc(
-        'create_sale',
+        'create_sale_with_customer_image',
         params: {
           'p_vehicle_id': sale.vehicleId,
           'p_customer_name': sale.customer,
@@ -249,6 +258,7 @@ class SupabaseMotorRepository {
           'p_months': sale.months,
           'p_sale_id': sale.id,
           'p_repair_cost': draft.repairCost,
+          'p_customer_image_path': sale.customerImage,
         },
       );
 
@@ -302,6 +312,32 @@ class SupabaseMotorRepository {
           ),
         );
     return client.storage.from('vehicle-images').getPublicUrl(path);
+  }
+
+  Future<String> uploadCustomerImage({
+    required Uint8List bytes,
+    required String branchId,
+    required String invoiceReference,
+    required String extension,
+    required String contentType,
+  }) async {
+    final safeExtension = ['jpg', 'jpeg', 'png', 'webp'].contains(extension)
+        ? extension
+        : 'jpg';
+    final version = DateTime.now().microsecondsSinceEpoch;
+    final path =
+        '${_safePathPart(branchId)}/customers/${_safePathPart(invoiceReference)}/$version.$safeExtension';
+    await client.storage
+        .from('customer-images')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType,
+            cacheControl: '3600',
+          ),
+        );
+    return path;
   }
 
   Future<void> deleteVehicleImage(String publicUrl) async {

@@ -1,6 +1,9 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'branding.dart';
 import 'domain.dart';
@@ -8,6 +11,8 @@ import 'store.dart';
 import 'ui.dart';
 import 'forms.dart';
 import 'invoice.dart';
+import 'motion.dart';
+import 'login_background.dart';
 
 class LoginScreen extends StatefulWidget {
   final MotorStore store;
@@ -48,195 +53,202 @@ class _LoginScreenState extends State<LoginScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && !busy) setState(() => showLogin = false);
       },
-      child: Scaffold(
-        backgroundColor: const Color(0xfff5f2ff),
-        appBar: AppBar(
-          backgroundColor: const Color(0xfff5f2ff),
-          leading: IconButton(
-            key: const Key('welcomeBack'),
-            tooltip: 'Back to welcome',
-            onPressed: busy ? null : () => setState(() => showLogin = false),
-            icon: const Icon(Icons.arrow_back_rounded, color: brandNavy),
+      child: LoginAtmosphere(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            systemOverlayStyle:
+                (isDarkMode(context)
+                        ? SystemUiOverlayStyle.light
+                        : SystemUiOverlayStyle.dark)
+                    .copyWith(
+                      statusBarColor: Colors.transparent,
+                      systemNavigationBarColor: Theme.of(context)
+                          .scaffoldBackgroundColor,
+                    ),
+            leading: IconButton(
+              key: const Key('welcomeBack'),
+              tooltip: 'Back to welcome',
+              onPressed: busy ? null : () => setState(() => showLogin = false),
+              icon: Icon(
+                Icons.arrow_back_rounded,
+                color: isDarkMode(context) ? darkInk : brandNavy,
+              ),
+            ),
           ),
-        ),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    const Brand(),
-                    const SizedBox(height: 32),
-                    const Pill('YOUR SHOWROOM, CONNECTED'),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(color: brandNavy),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Your showroom. Your inventory.\nOne connected workspace.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: muted, height: 1.5),
-                    ),
-                    const SizedBox(height: 26),
-                    if (!widget.store.usesSupabase) ...[
-                      SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment(
-                            value: true,
-                            label: Text('Admin'),
-                            icon: Icon(Icons.admin_panel_settings_outlined),
-                          ),
-                          ButtonSegment(
-                            value: false,
-                            label: Text('Showroom staff'),
-                            icon: Icon(Icons.storefront_outlined),
-                          ),
-                        ],
-                        selected: {admin},
-                        onSelectionChanged: (v) => setState(() {
-                          admin = v.first;
-                          user.text = admin
-                              ? 'admin@motorstock.demo'
-                              : 'staff@motorstock.demo';
-                        }),
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      const Brand(animateText: true),
+                      const SizedBox(height: 32),
+                      StaggeredTextReveal(
+                        words: 'Welcome back',
+                        delay: const Duration(milliseconds: 140),
+                        style: Theme.of(context).textTheme.headlineMedium,
                       ),
-                      const SizedBox(height: 16),
-                    ],
-                    Panel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Username / Login ID',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
+                      const SizedBox(height: 26),
+                      if (!widget.store.usesSupabase) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: CompactMenu(
+                            key: const Key('loginRole'),
+                            label: 'Demo role',
+                            value: admin ? 'Admin' : 'Showroom staff',
+                            options: const ['Admin', 'Showroom staff'],
+                            icon: Icons.person_outline_rounded,
+                            animateText: true,
+                            onChanged: (v) => setState(() {
+                              admin = v == 'Admin';
+                              user.text = admin
+                                  ? 'admin@motorstock.demo'
+                                  : 'staff@motorstock.demo';
+                            }),
                           ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: user,
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      Panel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const StaggeredTextReveal(
+                              words: 'Login ID',
+                              textAlign: TextAlign.start,
+                              delay: Duration(milliseconds: 320),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
                             ),
-                            keyboardType: TextInputType.text,
-                          ),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Password',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: user,
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.badge_outlined),
+                              ),
+                              keyboardType: TextInputType.text,
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: password,
-                            obscureText: hidden,
-                            decoration: InputDecoration(
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                tooltip: 'Show password',
-                                onPressed: () =>
-                                    setState(() => hidden = !hidden),
-                                icon: Icon(
-                                  hidden
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
+                            const SizedBox(height: 18),
+                            const StaggeredTextReveal(
+                              words: 'Password',
+                              textAlign: TextAlign.start,
+                              delay: Duration(milliseconds: 380),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: password,
+                              obscureText: hidden,
+                              decoration: InputDecoration(
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  tooltip: 'Show password',
+                                  onPressed: () =>
+                                      setState(() => hidden = !hidden),
+                                  icon: Icon(
+                                    hidden
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          FilledButton.icon(
-                            key: const Key('login'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: brandNavy,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: busy
-                                ? null
-                                : () async {
-                                    if (user.text.trim().isEmpty ||
-                                        password.text.isEmpty) {
-                                      notice(
-                                        context,
-                                        'Enter your username and password.',
-                                      );
-                                      return;
-                                    }
-                                    setState(() => busy = true);
-                                    try {
-                                      await widget.store.loginWithPassword(
-                                        user.text,
-                                        password.text,
-                                        demoAdmin: admin,
-                                      );
-                                    } catch (e) {
-                                      if (context.mounted) {
+                            const SizedBox(height: 20),
+                            FilledButton.icon(
+                              key: const Key('login'),
+                              onPressed: busy
+                                  ? null
+                                  : () async {
+                                      if (user.text.trim().isEmpty ||
+                                          password.text.isEmpty) {
                                         notice(
                                           context,
-                                          e.toString().replaceFirst(
-                                            'Bad state: ',
-                                            '',
-                                          ),
+                                          'Enter your username and password.',
                                         );
+                                        return;
                                       }
-                                    } finally {
-                                      if (mounted) setState(() => busy = false);
-                                    }
-                                  },
-                            icon: const Icon(Icons.arrow_forward),
-                            label: Text(
-                              busy ? 'Signing in…' : 'Sign in to dashboard',
+                                      setState(() => busy = true);
+                                      try {
+                                        await widget.store.loginWithPassword(
+                                          user.text,
+                                          password.text,
+                                          demoAdmin: admin,
+                                        );
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          notice(
+                                            context,
+                                            e.toString().replaceFirst(
+                                              'Bad state: ',
+                                              '',
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => busy = false);
+                                        }
+                                      }
+                                    },
+                              icon: const Icon(Icons.arrow_forward),
+                              label: busy
+                                  ? const Text('Signing in…')
+                                  : const StaggeredTextReveal(
+                                      words: 'Sign in',
+                                      delay: Duration(milliseconds: 440),
+                                    ),
                             ),
-                          ),
-                          const SizedBox(height: 14),
-                          const Text(
-                            'Demo login: demo  /  demo123',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: muted, fontSize: 12),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    Panel(
-                      child: Row(
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            widget.store.usesSupabase
-                                ? Icons.cloud_done_outlined
-                                : Icons.offline_bolt_outlined,
-                            color: const Color(0xff087fa3),
+                          StaggeredTextReveal(
+                            words: widget.store.usesSupabase
+                                ? 'Connected workspace'
+                                : 'Offline demo',
+                            delay: const Duration(milliseconds: 500),
+                            style: const TextStyle(color: muted, fontSize: 12),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              widget.store.usesSupabase
-                                  ? 'Your showroom, always in sync.\nSign in to access your team and inventory.'
-                                  : 'Offline demo · Sample data\nChanges are saved on this device.',
-                              style: const TextStyle(fontSize: 12, height: 1.6),
+                          if (!widget.store.usesSupabase)
+                            IconButton(
+                              tooltip: 'Demo details',
+                              icon: const Icon(
+                                Icons.info_outline_rounded,
+                                size: 17,
+                                color: muted,
+                              ),
+                              onPressed: () => showDialog<void>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Offline demo'),
+                                  content: const Text(
+                                    'Sample data is saved on this device.\n\nUse the prefilled credentials or sign in with demo / demo123.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Got it'),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'SMART DEALERSHIP MANAGEMENT',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: muted,
-                        letterSpacing: 1.8,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -254,15 +266,92 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   int page = 0;
-  final titles = ['Dashboard', 'Sale In', 'Sale Out', 'Billing', 'Stores'];
-  void go(int i) => setState(() => page = i);
+  final visited = <int>{0};
+  late final _tabAnimation = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+    value: 1,
+  );
+
+  void go(int i) {
+    if (i == page) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    HapticFeedback.selectionClick();
+    setState(() {
+      page = i;
+      visited.add(i);
+    });
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _tabAnimation.value = 1;
+    } else {
+      _tabAnimation.forward(from: 0);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _tabAnimation.value = 1;
+  }
+
+  @override
+  void dispose() {
+    _tabAnimation.dispose();
+    super.dispose();
+  }
+
+  Widget destination(int index) => switch (index) {
+    0 => Dashboard(store: widget.store, go: go),
+    1 => InventoryPage(store: widget.store),
+    2 => BillingPage(store: widget.store),
+    3 => SalesPage(store: widget.store),
+    _ => StoresPage(store: widget.store, embedded: true),
+  };
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Brand(compact: true),
+      backgroundColor: Colors.transparent,
+      foregroundColor: isDarkMode(context) ? Colors.white : brandNavy,
+      systemOverlayStyle: isDarkMode(context)
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
+      toolbarHeight: 72,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDarkMode(context)
+                ? const [Color(0xff1d3147), Color(0xff081321)]
+                : const [Color(0xf7ffffff), Color(0xe8edf6f8)],
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1610172a),
+              blurRadius: 22,
+              spreadRadius: -8,
+            ),
+          ],
+        ),
+      ),
+      title: Brand(compact: true, inverse: isDarkMode(context)),
       actions: [
+        IconButton(
+          key: const Key('appearanceMenu'),
+          tooltip: 'Appearance',
+          onPressed: () => showAppearanceSheet(context, widget.store),
+          icon: Icon(
+            widget.store.appearance == 'Dark'
+                ? Icons.dark_mode_rounded
+                : widget.store.appearance == 'System'
+                ? Icons.brightness_auto_rounded
+                : Icons.light_mode_rounded,
+            color: isDarkMode(context) ? Colors.white : brandNavy,
+          ),
+        ),
         IconButton(
           tooltip: 'Inventory alerts',
           onPressed: () => Navigator.push(
@@ -270,10 +359,15 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(builder: (_) => AlertsPage(store: widget.store)),
           ),
           icon: Badge(
+            backgroundColor: danger,
+            textColor: Colors.white,
             label: Text(
               '${widget.store.visibleVehicles.where((v) => v.stock <= 2).length}',
             ),
-            child: const Icon(Icons.notifications_none),
+            child: Icon(
+              Icons.notifications_none,
+              color: isDarkMode(context) ? Colors.white : brandNavy,
+            ),
           ),
         ),
         IconButton(
@@ -284,101 +378,192 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(
               builder: (_) => Scaffold(
                 appBar: AppBar(title: const Text('Account and settings')),
-                body: MorePage(store: widget.store),
+                body: ListenableBuilder(
+                  listenable: widget.store,
+                  builder: (context, _) => MorePage(store: widget.store),
+                ),
               ),
             ),
           ),
           icon: CircleAvatar(
             radius: 17,
-            backgroundColor: const Color(0xffdbeafe),
+            backgroundColor: const Color(0xffdff6f7),
             child: Text(
               widget.store.userInitials,
               style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: blue,
+                color: brandNavy,
               ),
             ),
           ),
         ),
       ],
     ),
-    body: Column(
-      children: [
-        Container(
-          color: const Color(0xffedf2ff),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-          child: Row(
-            children: [
-              const Icon(Icons.circle, size: 6, color: blue),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  widget.store.usesSupabase
-                      ? 'LIVE · Supabase cloud'
-                      : 'DEMO · Saved on this device',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: blue,
-                    fontWeight: FontWeight.w600,
+    body: TactileBackdrop(
+      child: Column(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 850),
+                child: AnimatedBuilder(
+                  animation: _tabAnimation,
+                  builder: (context, child) {
+                    final progress = Curves.easeOutCubic.transform(
+                      _tabAnimation.value,
+                    );
+                    return Opacity(
+                      opacity: .35 + .65 * progress,
+                      child: Transform.translate(
+                        offset: Offset(0, 12 * (1 - progress)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: IndexedStack(
+                    index: page,
+                    children: List.generate(
+                      5,
+                      (index) => TickerMode(
+                        enabled: index == page,
+                        child: ExcludeFocus(
+                          excluding: index != page,
+                          child: visited.contains(index)
+                              ? PrimaryScrollController.none(
+                                  child: destination(index),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              Text(
-                widget.store.isAdmin ? 'ADMIN' : 'STAFF',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: blue,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+            ),
           ),
+        ],
+      ),
+    ),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+        decoration: BoxDecoration(
+          color: surfaceColor(context)
+              .withValues(alpha: isDarkMode(context) ? .84 : .62),
+          borderRadius: BorderRadius.circular(23),
+          border: Border.all(
+            color: isDarkMode(context)
+                ? borderColor(context)
+                : Colors.white.withValues(alpha: .85),
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1710172a),
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
         ),
-        Expanded(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 850),
-              child: switch (page) {
-                0 => Dashboard(store: widget.store, go: go),
-                1 => InventoryPage(store: widget.store),
-                2 => SalesPage(store: widget.store),
-                3 => BillingPage(store: widget.store),
-                _ => StoresPage(store: widget.store, embedded: true),
-              },
+        clipBehavior: Clip.antiAlias,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(23),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: NavigationBar(
+              backgroundColor: surfaceColor(context)
+                  .withValues(alpha: isDarkMode(context) ? .82 : .58),
+              animationDuration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 380),
+              selectedIndex: page,
+              onDestinationSelected: go,
+              destinations: [
+                NavigationDestination(
+                  icon: _TabIcon(
+                    CupertinoIcons.square_grid_2x2,
+                    selected: page == 0,
+                  ),
+                  label: 'Home',
+                ),
+                NavigationDestination(
+                  icon: _TabIcon(CupertinoIcons.cube_box, selected: page == 1),
+                  label: 'Sales In',
+                ),
+                NavigationDestination(
+                  icon: _TabIcon(
+                    CupertinoIcons.doc_text,
+                    selected: page == 2,
+                    primary: true,
+                  ),
+                  label: 'Bill',
+                ),
+                NavigationDestination(
+                  icon: _TabIcon(CupertinoIcons.bag, selected: page == 3),
+                  label: 'Sales Out',
+                ),
+                NavigationDestination(
+                  icon: _TabIcon(
+                    CupertinoIcons.building_2_fill,
+                    selected: page == 4,
+                  ),
+                  label: 'Stores',
+                ),
+              ],
             ),
           ),
         ),
-      ],
+      ),
     ),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: page,
-      onDestinationSelected: go,
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.space_dashboard_outlined),
-          selectedIcon: Icon(Icons.space_dashboard),
-          label: 'Dashboard',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.input_rounded),
-          label: 'Sale In',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.output_rounded),
-          label: 'Sale Out',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.receipt_long_outlined),
-          label: 'Billing',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.storefront_outlined),
-          selectedIcon: Icon(Icons.storefront),
-          label: 'Stores',
-        ),
-      ],
+  );
+}
+
+class _TabIcon extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+  final bool primary;
+  const _TabIcon(this.icon, {required this.selected, this.primary = false});
+
+  @override
+  Widget build(BuildContext context) => AnimatedScale(
+    scale: selected ? 1.12 : 1,
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 360),
+    curve: Curves.easeOutBack,
+    child: AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 320),
+      width: primary ? 38 : 32,
+      height: primary ? 38 : 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected && isDarkMode(context)
+            ? const Color(0xff456b9d)
+            : Colors.transparent,
+        border: primary && isDarkMode(context)
+            ? Border.all(color: selected ? const Color(0xff7897b8) : darkLine)
+            : null,
+        boxShadow: selected && isDarkMode(context)
+            ? const [
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 12,
+                  spreadRadius: -3,
+                ),
+              ]
+            : const [],
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: selected
+            ? (isDarkMode(context) ? Colors.white : brandNavy)
+            : secondaryTextColor(context),
+      ),
     ),
   );
 }
@@ -388,22 +573,14 @@ class BranchPicker extends StatelessWidget {
   const BranchPicker(this.store, {super.key});
   @override
   Widget build(BuildContext context) => store.isAdmin
-      ? DropdownButtonFormField<String>(
-          initialValue: store.selectedBranch,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.storefront_outlined),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-          items: ['All branches', ...store.branchNames]
-              .map(
-                (b) => DropdownMenuItem(
-                  value: b,
-                  child: Text(b, style: const TextStyle(fontSize: 13)),
-                ),
-              )
-              .toList(),
-          onChanged: (b) => store.chooseBranch(b!),
+      ? CompactMenu(
+          key: const Key('branchPicker'),
+          label: 'Showroom',
+          value: store.selectedBranch,
+          options: ['All branches', ...store.branchNames],
+          labels: const {'All branches': 'All showrooms'},
+          icon: CupertinoIcons.building_2_fill,
+          onChanged: store.chooseBranch,
         )
       : Pill(store.userBranch);
 }
@@ -418,6 +595,7 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   String period = 'Month';
+
   List<Sale> get rows {
     final now = DateTime.now();
     return widget.store.visibleSales
@@ -429,7 +607,7 @@ class _DashboardState extends State<Dashboard> {
                   s.date.year == now.year &&
                       s.date.month == now.month &&
                       s.date.day == now.day,
-                'Week' => s.date.isAfter(
+                'Week' => !s.date.isBefore(
                   DateTime(
                     now.year,
                     now.month,
@@ -444,195 +622,109 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.store,
-        revenue = rows.fold(0.0, (a, b) => a + b.total),
-        stock = s.visibleVehicles.fold(0, (a, b) => a + b.stock);
+    final s = widget.store;
+    final revenue = rows.fold<double>(0, (a, b) => a + b.total);
+    final stock = s.visibleVehicles.fold<int>(0, (a, b) => a + b.stock);
     final alerts = s.visibleVehicles.where((v) => v.stock <= 2).toList();
     return ListView(
-      padding: const EdgeInsets.all(16),
+      key: const PageStorageKey('dashboardScroll'),
+      padding: const EdgeInsets.all(20),
       children: [
-        const SizedBox(height: 6),
-        Text(
-          'Good ${DateTime.now().hour < 12 ? 'morning' : 'afternoon'},',
-          style: const TextStyle(color: muted),
-        ),
-        Text(s.userName, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        Text(
-          'A clear view of your showroom operations.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 18),
-        BranchPicker(s),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => widget.go(3),
-              icon: const Icon(Icons.receipt_long, size: 18),
-              label: const Text('Create invoice'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EmiPage()),
+        MotionEntrance(
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Overview',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
               ),
-              icon: const Icon(Icons.calculate_outlined, size: 18),
-              label: const Text('EMI calculator'),
+              ActionMenu(
+                tooltip: 'Dashboard tools',
+                actions: [
+                  MenuAction(
+                    'EMI calculator',
+                    Icons.calculate_outlined,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const EmiPage()),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: BranchPicker(s)),
+            const SizedBox(width: 8),
+            CompactMenu(
+              key: const Key('dashboardPeriod'),
+              label: 'Reporting period',
+              value: period,
+              options: const ['Today', 'Week', 'Month'],
+              onChanged: (v) => setState(() => period = v),
             ),
           ],
         ),
-        SectionTitle(
-          'Network snapshot',
-          action: DropdownButton<String>(
-            value: period,
-            underline: const SizedBox(),
-            items: ['Today', 'Week', 'Month']
-                .map(
-                  (v) => DropdownMenuItem(
-                    value: v,
-                    child: Text(v, style: const TextStyle(fontSize: 12)),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) => setState(() => period = v!),
-          ),
-        ),
+        const SizedBox(height: 16),
         MetricGrid(
           children: [
             Metric(
-              'Invoiced revenue',
+              'Revenue',
               shortMoney(revenue),
-              period == 'Month' ? 'This calendar month' : period,
+              '',
               Icons.payments_outlined,
+              numericValue: revenue,
+              formatter: shortMoney,
             ),
             Metric(
-              'Available bikes',
-              '$stock units',
-              'Across selected branches',
+              'In stock',
+              '$stock',
+              '',
               Icons.two_wheeler,
+              numericValue: stock,
+              formatter: (v) => '${v.round()}',
             ),
             Metric(
-              'Sales recorded',
-              '${rows.fold(0, (a, b) => a + b.quantity)} units',
-              '${rows.length} invoices',
+              'Bikes sold',
+              '${rows.fold<int>(0, (a, b) => a + b.quantity)}',
+              '',
               Icons.shopping_bag_outlined,
+              numericValue: rows.fold<int>(0, (a, b) => a + b.quantity),
+              formatter: (v) => '${v.round()}',
             ),
             Metric(
-              'Pending balance',
-              shortMoney(rows.fold(0.0, (a, b) => a + b.balance)),
-              'From these invoices',
+              'Outstanding',
+              shortMoney(rows.fold<double>(0, (a, b) => a + b.balance)),
+              '',
               Icons.account_balance_wallet_outlined,
+              numericValue: rows.fold<double>(0, (a, b) => a + b.balance),
+              formatter: shortMoney,
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () => widget.go(2),
+          icon: const Icon(Icons.add_rounded, size: 19),
+          label: const Text('New invoice'),
+        ),
+        const SectionTitle('Last 4 weeks'),
+        Panel(child: RevenueChart(s.visibleSales)),
         SectionTitle(
-          'Inventory watch',
-          subtitle: 'Replenish stock before the next sale',
-          action: Pill('${alerts.length} alerts', color: amber),
-        ),
-        if (alerts.isEmpty)
-          const Panel(child: Text('Stock levels look healthy.')),
-        ...alerts
-            .take(3)
-            .map(
-              (v) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Panel(
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          BikeImage(v, width: 56, height: 52),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  v.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  v.branch,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: muted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Pill('${v.stock} left', color: statusColor(v.status)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => VehicleForm(store: s, vehicle: v),
-                            ),
-                          ),
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Update stock'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        const SectionTitle(
-          'Revenue by branch',
-          subtitle: 'Distribution for the selected period',
-        ),
-        Panel(
-          child: Column(
-            children: s.branches
-                .where((b) => s.allBranches || b.name == s.effectiveBranch)
-                .map((b) {
-                  final value = rows
-                      .where((sale) => sale.branch == b.name)
-                      .fold(0.0, (a, b) => a + b.total);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Column(
-                      children: [
-                        valueRow(b.name, shortMoney(value)),
-                        LinearProgressIndicator(
-                          value: revenue == 0 ? 0 : value / revenue,
-                          minHeight: 6,
-                          borderRadius: BorderRadius.circular(4),
-                          backgroundColor: line,
-                        ),
-                      ],
-                    ),
-                  );
-                })
-                .toList(),
-          ),
-        ),
-        const SectionTitle(
-          'Revenue velocity',
-          subtitle: 'Invoiced totals over the last four weeks',
-        ),
-        Panel(
-          child: SizedBox(height: 160, child: RevenueChart(s.visibleSales)),
-        ),
-        SectionTitle(
-          'Recent dealership sales',
+          'Recent sales',
           action: TextButton(
-            onPressed: () => widget.go(2),
-            child: const Text('Full ledger'),
+            onPressed: () => widget.go(3),
+            child: const Text('See all'),
           ),
         ),
+        if (s.visibleSales.isEmpty)
+          const Panel(
+            child: Text('No sales yet', style: TextStyle(color: muted)),
+          ),
         ...s.visibleSales
             .take(3)
             .map(
@@ -644,68 +736,268 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
             ),
+        const SizedBox(height: 12),
+        DetailDisclosure(
+          title: 'Stock alerts · ${alerts.length}',
+          leading: const Icon(
+            Icons.inventory_2_outlined,
+            size: 20,
+            color: amber,
+          ),
+          child: Column(
+            children: [
+              if (alerts.isEmpty) const Text('Stock levels look healthy.'),
+              ...alerts.map(
+                (v) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: BikeImage(v, width: 48, height: 46),
+                  title: Text(
+                    v.name,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    v.branch,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: Pill(
+                    '${v.stock} left',
+                    color: statusColor(v.status),
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => VehicleForm(store: s, vehicle: v),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        DetailDisclosure(
+          title: 'Revenue by showroom',
+          leading: const Icon(
+            CupertinoIcons.building_2_fill,
+            size: 20,
+            color: muted,
+          ),
+          child: Column(
+            children: s.branches
+                .where((b) => s.allBranches || b.name == s.effectiveBranch)
+                .map((b) {
+                  final value = rows
+                      .where((sale) => sale.branch == b.name)
+                      .fold<double>(0, (a, b) => a + b.total);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      children: [
+                        valueRow(b.name, shortMoney(value)),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(
+                            begin: 0,
+                            end: revenue == 0 ? 0 : value / revenue,
+                          ),
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 650),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, progress, _) =>
+                              LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 5,
+                                color: accent,
+                                borderRadius: BorderRadius.circular(8),
+                                backgroundColor: line,
+                                semanticsLabel: '${b.name} revenue share',
+                              ),
+                        ),
+                      ],
+                    ),
+                  );
+                })
+                .toList(),
+          ),
+        ),
         const SizedBox(height: 20),
       ],
     );
   }
 }
 
-class RevenueChart extends StatelessWidget {
+class RevenueChart extends StatefulWidget {
   final List<Sale> sales;
   const RevenueChart(this.sales, {super.key});
   @override
+  State<RevenueChart> createState() => _RevenueChartState();
+}
+
+class _RevenueChartState extends State<RevenueChart> {
+  int selected = 3;
+
+  @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final values = List.generate(
+    final weeks = List.generate(
       4,
-      (i) => sales
-          .where((s) {
-            final age = now.difference(s.date).inDays;
-            return s.status != 'Cancelled' && age >= i * 7 && age < (i + 1) * 7;
-          })
-          .fold(0.0, (a, b) => a + b.total),
+      (i) => widget.sales.where((s) {
+        final age = now.difference(s.date).inDays;
+        return s.status != 'Cancelled' && age >= i * 7 && age < (i + 1) * 7;
+      }).toList(),
     ).reversed.toList();
+    final values = weeks
+        .map((week) => week.fold(0.0, (sum, sale) => sum + sale.total))
+        .toList();
     final maxValue = values.fold(1.0, math.max);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: List.generate(
-        4,
-        (i) => Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FittedBox(
-                  child: Text(
-                    shortMoney(values[i]),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Week ${selected + 1} · ${weeks[selected].length} invoices',
+                    key: const Key('revenueSelection'),
+                    style: const TextStyle(fontSize: 12, color: muted),
+                  ),
+                  const SizedBox(height: 4),
+                  AnimatedAmount(
+                    value: values[selected],
+                    format: money,
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                      color: isDarkMode(context) ? neon : brandNavy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              CupertinoIcons.chart_bar_alt_fill,
+              color: brandTeal,
+              size: 24,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 172,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(
+              4,
+              (i) => Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: i == selected,
+                  label:
+                      'Week ${i + 1}, ${money(values[i])}, ${weeks[i].length} invoices',
+                  child: PressFeedback(
+                    child: InkWell(
+                      key: Key('revenueWeek$i'),
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        if (selected == i) return;
+                        HapticFeedback.selectionClick();
+                        setState(() => selected = i);
+                      },
+                      child: ExcludeSemantics(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              FittedBox(
+                                child: Text(
+                                  shortMoney(values[i]),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected == i
+                                        ? (isDarkMode(context)
+                                              ? neon
+                                              : brandNavy)
+                                        : secondaryTextColor(context),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Flexible(
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(
+                                    begin: 0,
+                                    end: math.max(
+                                      4,
+                                      104 * values[i] / maxValue,
+                                    ),
+                                  ),
+                                  duration: reduced
+                                      ? Duration.zero
+                                      : Duration(milliseconds: 600 + i * 70),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, height, _) =>
+                                      AnimatedContainer(
+                                        duration: reduced
+                                            ? Duration.zero
+                                            : const Duration(milliseconds: 250),
+                                        height: height,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: selected == i
+                                                ? [accent, brandTeal]
+                                                : [
+                                                    const Color(0xffc7e8ed),
+                                                    const Color(0xffa5cad7),
+                                                  ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              FittedBox(
+                                child: Text(
+                                  i == 3 ? 'This week' : '${3 - i}w ago',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: selected == i ? brandNavy : muted,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  height: math.max(3, 100 * values[i] / maxValue),
-                  decoration: BoxDecoration(
-                    color: i == 3 ? blue : const Color(0xff93b4f5),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(7),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  i == 3 ? 'This week' : '${3 - i}w ago',
-                  style: const TextStyle(fontSize: 10, color: muted),
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        const Text(
+          'Tap a bar to explore a week',
+          style: TextStyle(color: muted, fontSize: 11),
+        ),
+      ],
     );
   }
 }
@@ -719,6 +1011,14 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   String search = '', category = 'All', status = 'All stock';
+
+  void openVehicle(Vehicle v) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => VehicleDetail(store: widget.store, vehicleId: v.id),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final s = widget.store;
@@ -733,23 +1033,15 @@ class _InventoryPageState extends State<InventoryPage> {
         )
         .toList();
     return ListView(
-      padding: const EdgeInsets.all(16),
+      key: const PageStorageKey('inventoryScroll'),
+      padding: const EdgeInsets.all(20),
       children: [
         Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sale In / Inventory',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  Text(
-                    '${vehicles.fold(0, (a, b) => a + b.stock)} available units',
-                    style: const TextStyle(color: muted, fontSize: 12),
-                  ),
-                ],
+              child: Text(
+                'Sales In',
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
             ),
             FilledButton(
@@ -766,219 +1058,183 @@ class _InventoryPageState extends State<InventoryPage> {
           key: const Key('inventorySearch'),
           onChanged: (v) => setState(() => search = v),
           decoration: const InputDecoration(
-            hintText: 'Search model, brand or VIN',
-            prefixIcon: Icon(Icons.search),
+            hintText: 'Search bikes',
+            prefixIcon: Icon(Icons.search_rounded),
           ),
         ),
         const SizedBox(height: 12),
         BranchPicker(s),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children:
-                [
-                      'All',
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: CompactMenu(
+                key: const Key('inventoryCategory'),
+                label: 'Category',
+                value: category,
+                options: [
+                  'All',
+                  ...{
+                    ...const [
                       'Supersport',
                       'Superbike',
                       'Cruiser',
                       'Roadster',
                       'Commuter',
-                    ]
-                    .map(
-                      (v) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(v),
-                          selected: category == v,
-                          onSelected: (_) => setState(() => category = v),
-                        ),
-                      ),
-                    )
-                    .toList(),
+                    ],
+                    ...s.visibleVehicles.map((v) => v.category),
+                  },
+                ],
+                labels: const {'All': 'All categories'},
+                onChanged: (v) => setState(() => category = v),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: CompactMenu(
+                key: const Key('inventoryStock'),
+                label: 'Stock availability',
+                value: status,
+                options: const [
+                  'All stock',
+                  'In stock',
+                  'Low stock',
+                  'Out of stock',
+                ],
+                onChanged: (v) => setState(() => status = v),
+              ),
+            ),
+          ],
+        ),
+        SectionTitle(
+          'Bikes',
+          action: Text(
+            '${vehicles.length}',
+            style: const TextStyle(color: muted, fontSize: 13),
           ),
         ),
-        const SizedBox(height: 8),
-        DropdownButton<String>(
-          value: status,
-          isExpanded: true,
-          items: [
-            'All stock',
-            'In stock',
-            'Low stock',
-            'Out of stock',
-          ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-          onChanged: (v) => setState(() => status = v!),
-        ),
-        const SizedBox(height: 12),
         if (vehicles.isEmpty)
           emptyState(
-            'No vehicles found',
-            'Try another search or add a vehicle.',
+            'No bikes found',
+            'Try another filter.',
             Icons.two_wheeler,
           ),
         ...vehicles.map(
-          (v) => Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Panel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Pill(v.category),
-                      const SizedBox(width: 8),
-                      Text(
-                        'MY ${v.year}',
-                        style: const TextStyle(fontSize: 11, color: muted),
-                      ),
-                      const Spacer(),
-                      Pill(v.status, color: statusColor(v.status)),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      BikeImage(v),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              v.name,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              v.branch,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: muted,
-                              ),
-                            ),
-                            Text(
-                              v.color,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: canvas,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Purchase cost',
-                                style: TextStyle(fontSize: 10, color: muted),
-                              ),
-                              Text(
-                                money(v.cost),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+          (v) => MotionEntrance(
+            key: ValueKey(v.id),
+            order: vehicles.indexOf(v).clamp(0, 4),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: PressFeedback(
+                child: Panel(
+                  padding: EdgeInsets.zero,
+                  child: InkWell(
+                    onTap: () => openVehicle(v),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
+                      child: Row(
+                        children: [
+                          BikeImage(v, width: 72, height: 76),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  v.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'Selling price',
-                                style: TextStyle(fontSize: 10, color: muted),
-                              ),
-                              Text(
-                                money(v.price),
-                                style: const TextStyle(
-                                  color: blue,
-                                  fontWeight: FontWeight.w800,
+                                const SizedBox(height: 3),
+                                Text(
+                                  v.branch,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: muted,
+                                    fontSize: 11,
+                                  ),
                                 ),
+                                const SizedBox(height: 9),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 5,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      money(v.price),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: isDarkMode(context)
+                                            ? neon
+                                            : brandNavy,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${v.stock} left',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: statusColor(v.status),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          ActionMenu(
+                            key: ValueKey('vehicleActions-${v.id}'),
+                            tooltip: 'Actions for ${v.name}',
+                            actions: [
+                              MenuAction(
+                                'View details',
+                                Icons.info_outline,
+                                () => openVehicle(v),
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '${v.vin}  ·  ${v.stock} units',
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                      color: muted,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                VehicleDetail(store: s, vehicleId: v.id),
-                          ),
-                        ),
-                        icon: const Icon(Icons.visibility_outlined, size: 16),
-                        label: const Text('View'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => VehicleForm(store: s, vehicle: v),
-                          ),
-                        ),
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                        label: const Text('Edit'),
-                      ),
-                      if (s.isAdmin)
-                        IconButton(
-                          tooltip: 'Transfer stock',
-                          onPressed: () => transferDialog(context, s, v),
-                          icon: const Icon(Icons.swap_horiz, color: blue),
-                        ),
-                      if (s.isAdmin)
-                        IconButton(
-                          tooltip: 'Delete vehicle',
-                          onPressed: () async {
-                            if (await confirm(
+                              MenuAction(
+                                'Edit bike',
+                                Icons.edit_outlined,
+                                () => Navigator.push(
                                   context,
-                                  'Remove vehicle?',
-                                  s.usesSupabase
-                                      ? 'Remove ${v.name} from inventory?'
-                                      : 'Remove ${v.name} from the demo inventory?',
-                                ) &&
-                                context.mounted) {
-                              await perform(context, () => s.deleteVehicle(v));
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        VehicleForm(store: s, vehicle: v),
+                                  ),
+                                ),
+                              ),
+                              if (s.isAdmin)
+                                MenuAction(
+                                  'Transfer stock',
+                                  Icons.swap_horiz,
+                                  () => transferDialog(context, s, v),
+                                ),
+                              if (s.isAdmin)
+                                MenuAction('Delete vehicle', Icons.delete_outline, () async {
+                                  if (await confirm(
+                                        context,
+                                        'Remove vehicle?',
+                                        s.usesSupabase
+                                            ? 'Remove ${v.name} from inventory?'
+                                            : 'Remove ${v.name} from the demo inventory?',
+                                      ) &&
+                                      context.mounted) {
+                                    await perform(
+                                      context,
+                                      () => s.deleteVehicle(v),
+                                    );
+                                  }
+                                }, destructive: true),
+                            ],
                           ),
-                        ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1074,73 +1330,84 @@ class SaleTile extends StatelessWidget {
   final VoidCallback onTap;
   const SaleTile({super.key, required this.sale, required this.onTap});
   @override
-  Widget build(BuildContext context) => Panel(
-    child: InkWell(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  sale.id,
-                  style: const TextStyle(fontSize: 11, color: muted),
-                ),
-              ),
-              Pill(sale.payment, color: statusColor(sale.payment)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xffedf2ff),
-                child: Text(
-                  sale.customer.substring(0, 1),
-                  style: const TextStyle(color: blue),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
+  Widget build(BuildContext context) => MotionEntrance(
+    child: PressFeedback(
+      child: Panel(
+        padding: EdgeInsets.zero,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      sale.customer,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sale.customer,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            sale.bike,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: muted),
+                          ),
+                        ],
+                      ),
                     ),
-                    Text(
-                      sale.bike,
-                      style: const TextStyle(fontSize: 12, color: muted),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      fit: FlexFit.tight,
+                      child: Text(
+                        shortMoney(sale.total),
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isDarkMode(context) ? neon : brandNavy,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                shortMoney(sale.total),
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          valueRow(
-            'Paid / Balance',
-            '${shortMoney(sale.paid)} / ${shortMoney(sale.balance)}',
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${sale.branch}\n${dateLabel(sale.date)}',
-                  style: const TextStyle(fontSize: 11, color: muted),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        dateLabel(sale.date),
+                        style: const TextStyle(fontSize: 11, color: muted),
+                      ),
+                    ),
+                    Pill(
+                      sale.status == 'Cancelled' ? 'Cancelled' : sale.payment,
+                      color: statusColor(
+                        sale.status == 'Cancelled' ? 'Cancelled' : sale.payment,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: muted,
+                      size: 17,
+                    ),
+                  ],
                 ),
-              ),
-              Pill(sale.status, color: statusColor(sale.status)),
-              const Icon(Icons.chevron_right, color: muted, size: 18),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     ),
   );
@@ -1185,115 +1452,126 @@ class _SalesPageState extends State<SalesPage> {
           ? a.date.compareTo(b.date)
           : b.date.compareTo(a.date),
     );
+    final total = rows
+        .where((s) => s.status != 'Cancelled')
+        .fold<double>(0, (a, b) => a + b.total);
+    final balance = rows
+        .where((s) => s.status != 'Cancelled')
+        .fold<double>(0, (a, b) => a + b.balance);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      key: const PageStorageKey('salesScroll'),
+      padding: const EdgeInsets.all(20),
       children: [
-        Text('Sale Out', style: Theme.of(context).textTheme.headlineMedium),
-        const Text(
-          'Vehicle sales & transaction ledger',
-          style: TextStyle(color: muted),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Sales Out',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            ActionMenu(
+              tooltip: 'Sales actions',
+              actions: [
+                MenuAction(
+                  'Export ledger PDF',
+                  Icons.file_download_outlined,
+                  () => exportLedger(context, rows),
+                  enabled: rows.isNotEmpty,
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
         MetricGrid(
           children: [
             Metric(
-              'Sales volume',
-              shortMoney(
-                rows
-                    .where((s) => s.status != 'Cancelled')
-                    .fold(0.0, (a, b) => a + b.total),
-              ),
-              'Filtered invoices',
+              'Revenue',
+              shortMoney(total),
+              '',
               Icons.receipt_long,
+              numericValue: total,
+              formatter: shortMoney,
             ),
             Metric(
               'Outstanding',
-              shortMoney(
-                rows
-                    .where((s) => s.status != 'Cancelled')
-                    .fold(0.0, (a, b) => a + b.balance),
-              ),
-              'Customer balance',
+              shortMoney(balance),
+              '',
               Icons.account_balance_wallet_outlined,
+              numericValue: balance,
+              formatter: shortMoney,
             ),
           ],
         ),
         const SizedBox(height: 18),
         TextField(
+          key: const Key('salesSearch'),
           onChanged: (v) => setState(() => search = v),
           decoration: const InputDecoration(
-            hintText: 'Customer, model, phone or invoice',
-            prefixIcon: Icon(Icons.search),
+            hintText: 'Search sales',
+            prefixIcon: Icon(Icons.search_rounded),
           ),
         ),
         const SizedBox(height: 12),
-        BranchPicker(widget.store),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          children: ['All', 'Paid', 'Partial', 'Pending']
-              .map(
-                (v) => ChoiceChip(
-                  label: Text(v),
-                  selected: payment == v,
-                  onSelected: (_) => setState(() => payment = v),
-                ),
-              )
-              .toList(),
+        Row(
+          children: [
+            Expanded(flex: 3, child: BranchPicker(widget.store)),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: CompactMenu(
+                key: const Key('salesPayment'),
+                label: 'Payment status',
+                value: payment,
+                options: const ['All', 'Paid', 'Partial', 'Pending'],
+                labels: const {'All': 'All payments'},
+                onChanged: (v) => setState(() => payment = v),
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
-              child: DropdownButton<String>(
+              child: CompactMenu(
+                key: const Key('salesPeriod'),
+                label: 'Invoice date',
                 value: period,
-                isExpanded: true,
-                items: ['All dates', 'Today', 'This month']
-                    .map(
-                      (v) => DropdownMenuItem(
-                        value: v,
-                        child: Text(v, style: const TextStyle(fontSize: 12)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => period = v!),
+                options: const ['All dates', 'Today', 'This month'],
+                onChanged: (v) => setState(() => period = v),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 8),
             Expanded(
-              child: DropdownButton<String>(
+              child: CompactMenu(
+                key: const Key('salesSort'),
+                label: 'Sort sales',
                 value: sort,
-                isExpanded: true,
-                items: ['Newest', 'Oldest', 'Highest amount']
-                    .map(
-                      (v) => DropdownMenuItem(
-                        value: v,
-                        child: Text(v, style: const TextStyle(fontSize: 12)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => sort = v!),
+                options: const ['Newest', 'Oldest', 'Highest amount'],
+                icon: Icons.sort_rounded,
+                onChanged: (v) => setState(() => sort = v),
               ),
             ),
           ],
         ),
         SectionTitle(
-          'Sales records',
-          subtitle: '${rows.length} matching invoices',
-          action: IconButton(
-            tooltip: 'Export ledger PDF',
-            onPressed: rows.isEmpty ? null : () => exportLedger(context, rows),
-            icon: const Icon(Icons.file_download_outlined),
+          'Invoices',
+          action: Text(
+            '${rows.length}',
+            style: const TextStyle(color: muted, fontSize: 13),
           ),
         ),
         if (rows.isEmpty)
           emptyState(
             'No sales found',
-            'Change the filters or create your first invoice.',
+            'Try another filter.',
             Icons.receipt_long,
           ),
         ...rows.map(
           (sale) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 10),
             child: SaleTile(
               sale: sale,
               onTap: () => openSale(context, widget.store, sale),
@@ -1352,6 +1630,20 @@ class SaleDetail extends StatelessWidget {
             Panel(
               child: Column(
                 children: [
+                  if (s.customerImage.isNotEmpty) ...[
+                    Semantics(
+                      image: true,
+                      label: '${s.customer} customer photo',
+                      child: ItemImage(
+                        s.customerImage,
+                        key: const Key('saleCustomerImage'),
+                        width: double.infinity,
+                        height: 170,
+                        fallbackIcon: Icons.person_outline_rounded,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   valueRow('Customer', s.customer),
                   valueRow('Phone', s.phone),
                   valueRow(
@@ -1425,6 +1717,17 @@ class SaleDetail extends StatelessWidget {
               DropdownButtonFormField<String>(
                 key: ValueKey(s.status),
                 initialValue: s.status,
+                isExpanded: true,
+                itemHeight: 52,
+                menuMaxHeight: MediaQuery.sizeOf(context).height * .48,
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: raisedColor(context),
+                iconEnabledColor: secondaryTextColor(context),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: const InputDecoration(labelText: 'Status'),
                 items:
                     [
                           'Booking confirmed',
@@ -1475,6 +1778,27 @@ class MorePage extends StatelessWidget {
     children: [
       Text('Your workspace', style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 20),
+      const SectionTitle('Appearance'),
+      Panel(
+        child: Row(
+          children: [
+            for (final item in const [
+              ('Light', Icons.light_mode_rounded),
+              ('System', Icons.brightness_auto_rounded),
+              ('Dark', Icons.dark_mode_rounded),
+            ]) ...[
+              TactileChoice(
+                label: item.$1,
+                icon: item.$2,
+                selected: store.appearance == item.$1,
+                onTap: () => store.setAppearance(item.$1),
+              ),
+              if (item.$1 != 'Dark') const SizedBox(width: 8),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
       Panel(
         child: Column(
           children: [
@@ -1509,7 +1833,6 @@ class MorePage extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.calculate_outlined, color: blue),
               title: const Text('EMI calculator'),
-              subtitle: const Text('Plan down payment and installments'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
@@ -1544,8 +1867,8 @@ class MorePage extends StatelessWidget {
       SectionTitle(store.usesSupabase ? 'Cloud account' : 'Demo settings'),
       Text(
         store.usesSupabase
-            ? 'Connected to Supabase. Access is enforced by your account role and assigned showroom.'
-            : 'This build works offline with sample records. Changes stay on this device and do not update the PHP/MySQL database.',
+            ? 'Connected to your showroom account.'
+            : 'Offline demo. Sample data and changes stay on this device.',
         style: const TextStyle(color: muted, height: 1.5),
       ),
       const SizedBox(height: 16),
@@ -1585,13 +1908,56 @@ class MorePage extends StatelessWidget {
       const SizedBox(height: 24),
       const Center(
         child: Text(
-          'MotorStock · Flutter 1.0',
+          'MotorStock · 1.2.0',
           style: TextStyle(color: muted, fontSize: 12),
         ),
       ),
     ],
   );
 }
+
+Future<void> showAppearanceSheet(BuildContext context, MotorStore store) =>
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Appearance',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  for (final item in const [
+                    ('Light', Icons.light_mode_rounded),
+                    ('System', Icons.brightness_auto_rounded),
+                    ('Dark', Icons.dark_mode_rounded),
+                  ]) ...[
+                    TactileChoice(
+                      label: item.$1,
+                      icon: item.$2,
+                      selected: store.appearance == item.$1,
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        store.setAppearance(item.$1);
+                      },
+                    ),
+                    if (item.$1 != 'Dark') const SizedBox(width: 8),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
 class EmiPage extends StatefulWidget {
   const EmiPage({super.key});
@@ -1753,75 +2119,112 @@ class StoresPage extends StatelessWidget {
           .where((b) => store.isAdmin || b.name == store.userBranch)
           .toList();
       final content = ListView(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         children: [
-          SectionTitle(
-            'Stores',
-            subtitle: 'Choose a showroom to view its employees.',
-            action: store.isAdmin
-                ? IconButton(
-                    tooltip: 'Add showroom',
-                    onPressed: () => branchDialog(context, store),
-                    icon: const Icon(Icons.add_business, color: blue),
-                  )
-                : null,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Stores',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              if (store.isAdmin)
+                ActionMenu(
+                  tooltip: 'Store actions',
+                  actions: [
+                    MenuAction(
+                      'Add showroom',
+                      Icons.add_business_outlined,
+                      () => branchDialog(context, store),
+                    ),
+                  ],
+                ),
+            ],
           ),
+          const SizedBox(height: 18),
           if (branches.isEmpty)
             emptyState(
               'No stores yet',
-              'Your assigned showroom will appear here.',
+              'Your showroom will appear here.',
               Icons.storefront_outlined,
             ),
           ...branches.map((b) {
-            final rows = store.sales.where(
-              (s) => s.branch == b.name && s.status != 'Cancelled',
-            );
             final employees = store.staff
                 .where((e) => e.branch == b.name)
                 .length;
+            final stock = store.vehicles
+                .where((v) => v.branch == b.name)
+                .fold<int>(0, (a, b) => a + b.stock);
             return Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Panel(
-                child: InkWell(
-                  key: Key('store-${b.id}'),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => StoreDetailPage(store: store, branch: b),
+              padding: const EdgeInsets.only(bottom: 12),
+              child: PressFeedback(
+                child: Panel(
+                  padding: EdgeInsets.zero,
+                  child: InkWell(
+                    key: Key('store-${b.id}'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            StoreDetailPage(store: store, branch: b),
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
                         children: [
-                          const Icon(Icons.storefront, color: blue),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              b.name,
-                              style: Theme.of(context).textTheme.titleMedium,
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xffe9f6f7),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.storefront_outlined,
+                              color: brandNavy,
+                              size: 24,
                             ),
                           ),
-                          const Icon(Icons.chevron_right, color: muted),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  b.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  b.location,
+                                  style: const TextStyle(
+                                    color: muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '$employees staff · $stock bikes',
+                                  style: const TextStyle(
+                                    color: muted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 19,
+                            color: muted,
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        b.location,
-                        style: const TextStyle(color: muted, fontSize: 12),
-                      ),
-                      valueRow('Employees', '$employees'),
-                      valueRow(
-                        'Available bikes',
-                        '${store.vehicles.where((v) => v.branch == b.name).fold(0, (a, b) => a + b.stock)}',
-                      ),
-                      valueRow(
-                        'Invoiced revenue',
-                        shortMoney(rows.fold(0.0, (a, b) => a + b.total)),
-                        bold: true,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1856,6 +2259,30 @@ class StoreDetailPage extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           children: [
             Text(branch.location, style: const TextStyle(color: muted)),
+            const SizedBox(height: 12),
+            DetailDisclosure(
+              title: 'Showroom summary',
+              child: Column(
+                children: [
+                  valueRow(
+                    'Invoiced revenue',
+                    shortMoney(
+                      store.sales
+                          .where(
+                            (s) =>
+                                s.branch == branch.name &&
+                                s.status != 'Cancelled',
+                          )
+                          .fold<double>(0, (a, b) => a + b.total),
+                    ),
+                  ),
+                  valueRow(
+                    'Available bikes',
+                    '${store.vehicles.where((v) => v.branch == branch.name).fold<int>(0, (a, b) => a + b.stock)}',
+                  ),
+                ],
+              ),
+            ),
             SectionTitle(
               'Employees',
               subtitle: '${employees.length} team members',
